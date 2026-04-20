@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import './App.css'
 
 function App() {
   const [count, setCount] = useState(0)
@@ -10,7 +9,7 @@ function App() {
         <div className="logo">Questline</div>
         <div className="status">System Online</div>
       </nav>
-      
+
       <main className="content">
         <header className="hero">
           <h1>React <span className="gradient-text">+</span> Electron</h1>
@@ -21,11 +20,9 @@ function App() {
           <div className="glass-card">
             <h2>Desktop Power</h2>
             <p>Access native system features with TypeScript safety.</p>
-            <div className="counter-box">
-              <button onClick={() => setCount((count) => count + 1)}>
-                Interaction Count: {count}
-              </button>
-            </div>
+            <button onClick={() => setCount((c) => c + 1)}>
+              Interaction Count: {count}
+            </button>
           </div>
 
           <div className="glass-card">
