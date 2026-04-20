@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { isDev } from "./isDev.js";
@@ -33,6 +33,8 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
   }
 }
+
+ipcMain.handle("ping", () => "pong");
 
 app.whenReady().then(() => {
   createWindow();
