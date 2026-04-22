@@ -2,7 +2,6 @@ import { app, BrowserWindow, ipcMain, safeStorage, shell, Notification } from "e
 import * as path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
-import { isDev } from "./isDev.js";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -62,16 +61,13 @@ function createWindow() {
     show: false,
   });
 
-  const startUrl = isDev
+  const startUrl = !app.isPackaged
     ? "http://localhost:5173"
     : `file://${path.join(__dirname, "../dist/index.html")}`;
 
   mainWindow.loadURL(startUrl);
   mainWindow.once("ready-to-show", () => mainWindow.show());
 
-  if (isDev) {
-    mainWindow.webContents.openDevTools();
-  }
 }
 
 // ── Jules API helpers ─────────────────────────────────────────────────────────
@@ -179,6 +175,33 @@ ipcMain.handle("jules:approve-plan", (_event, sessionName: string) =>
     body: JSON.stringify({}),
   })
 );
+
+// ── Persistance locale ────────────────────────────────────────────────────────
+
+const sessionsFile = () => path.join(app.getPath("userData"), "sessions.json");
+const logFile      = () => path.join(app.getPath("userData"), "session-log.json");
+
+ipcMain.handle("store:read-sessions", () => {
+  try { return JSON.parse(fs.readFileSync(sessionsFile(), "utf8")); }
+  catch { return []; }
+});
+
+ipcMain.handle("store:write-sessions", (_event, sessions: unknown[]) => {
+  fs.writeFileSync(sessionsFile(), JSON.stringify(sessions, null, 2), "utf8");
+});
+
+ipcMain.handle("store:read-logs", () => {
+  try { return JSON.parse(fs.readFileSync(logFile(), "utf8")); }
+  catch { return []; }
+});
+
+ipcMain.handle("store:append-log", (_event, entry: unknown) => {
+  let logs: unknown[] = [];
+  try { logs = JSON.parse(fs.readFileSync(logFile(), "utf8")); } catch {}
+  logs.push(entry);
+  if (logs.length > 2000) logs = logs.slice(-2000);
+  fs.writeFileSync(logFile(), JSON.stringify(logs, null, 2), "utf8");
+});
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 

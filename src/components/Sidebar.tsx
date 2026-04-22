@@ -1,4 +1,4 @@
-type Page = 'dashboard' | 'sessions' | 'agents' | 'pipelines' | 'logs' | 'settings';
+type Page = 'dashboard' | 'sessions' | 'agents' | 'logs' | 'settings';
 
 interface NavItem { id: Page; icon: string; label: string; }
 
@@ -6,7 +6,6 @@ const NAV: NavItem[] = [
   { id: 'dashboard', icon: '▣',  label: 'Dashboard'  },
   { id: 'sessions',  icon: '⚡', label: 'Sessions'   },
   { id: 'agents',    icon: '🤖', label: 'Agents'     },
-  { id: 'pipelines', icon: '⛓', label: 'Pipelines'  },
   { id: 'logs',      icon: '▤',  label: 'Logs'       },
 ];
 

@@ -4,6 +4,8 @@ import type {
   JulesSessionsResponse,
   ListActivitiesResponse,
   CreateSessionRequest,
+  LocalSession,
+  LogEntry,
 } from './types/jules';
 
 declare global {
@@ -26,6 +28,11 @@ declare global {
       // Système
       openExternal: (url: string)                  => Promise<void>;
       notify:       (title: string, body: string)  => Promise<void>;
+      // Persistance locale
+      readSessions:  ()                        => Promise<LocalSession[]>;
+      writeSessions: (sessions: LocalSession[]) => Promise<void>;
+      readLogs:      ()                        => Promise<LogEntry[]>;
+      appendLog:     (entry: LogEntry)         => Promise<void>;
     };
   }
 }

@@ -3,17 +3,15 @@ import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/DashboardPage';
 import SessionsPage  from './pages/SessionsPage';
 import AgentsPage    from './pages/AgentsPage';
-import PipelinesPage from './pages/PipelinesPage';
 import LogsPage      from './pages/LogsPage';
 import SettingsPage  from './pages/SettingsPage';
 
-export type Page = 'dashboard' | 'sessions' | 'agents' | 'pipelines' | 'logs' | 'settings';
+export type Page = 'dashboard' | 'sessions' | 'agents' | 'logs' | 'settings';
 
 const PAGES: Record<Page, JSX.Element> = {
   dashboard: <DashboardPage />,
   sessions:  <SessionsPage />,
   agents:    <AgentsPage />,
-  pipelines: <PipelinesPage />,
   logs:      <LogsPage />,
   settings:  <SettingsPage />,
 };

@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useAgents } from '../context/AgentsContext';
 import { julesService } from '../services/julesService';
 import type { AutomationMode, LocalSession } from '../types/jules';
+import Pagination from '../components/Pagination';
+
+const SESSIONS_PAGE_SIZE = 10;
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
@@ -174,6 +177,10 @@ export default function AgentsPage() {
   const filteredSessions = selectedSource
     ? sessions.filter(s => s.sourceContext?.source === selectedSource || s.sourceDisplayName === displayNameFor(selectedSource))
     : sessions;
+
+  const [sessionsPage, setSessionsPage] = useState(1);
+  useEffect(() => { setSessionsPage(1); }, [selectedSource]);
+  const paginatedSessions = filteredSessions.slice((sessionsPage - 1) * SESSIONS_PAGE_SIZE, sessionsPage * SESSIONS_PAGE_SIZE);
 
   function displayNameFor(sourceName: string): string {
     const src = sources.find(s => s.name === sourceName);
@@ -348,7 +355,7 @@ export default function AgentsPage() {
               Aucune session
             </p>
           ) : (
-            filteredSessions.map(s => (
+            paginatedSessions.map(s => (
               <div key={s.name}>
                 <SessionRow
                   session={s}
@@ -382,6 +389,7 @@ export default function AgentsPage() {
               </div>
             ))
           )}
+          <Pagination page={sessionsPage} pageSize={SESSIONS_PAGE_SIZE} total={filteredSessions.length} onChange={setSessionsPage} />
         </div>
       )}
 

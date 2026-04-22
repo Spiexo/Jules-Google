@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import type { JulesSource, LocalSession, CreateSessionRequest, SessionState } from '../types/jules';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
+import type { JulesSource, LocalSession, CreateSessionRequest, SessionState, LogEntry } from '../types/jules';
 import { julesService } from '../services/julesService';
 
 interface AgentsContextValue {
@@ -24,32 +24,65 @@ function sourceDisplayName(source: JulesSource): string {
   return source.id || source.name;
 }
 
+function makeLogEntry(session: LocalSession, state: SessionState): LogEntry {
+  return {
+    time:    new Date().toISOString(),
+    level:   state === 'FAILED' ? 'ERROR' : 'INFO',
+    source:  session.sourceDisplayName,
+    state,
+    message: `[${state}] ${session.localDescription}`,
+  };
+}
+
 export function AgentsProvider({ children }: { children: ReactNode }) {
   const [sources, setSources]               = useState<JulesSource[]>([]);
   const [sessions, setSessions]             = useState<LocalSession[]>([]);
   const [loadingSources, setLoadingSources] = useState(false);
   const [creatingSession, setCreating]      = useState(false);
   const [error, setError]                   = useState<string | null>(null);
+  const saveTimerRef                        = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initializedRef                      = useRef(false);
 
-  // Charge l'historique des sessions depuis l'API au démarrage
+  // Debounced disk write — triggered whenever sessions change after first load
   useEffect(() => {
-    julesService.listSessions().then(result => {
-      const apiSessions = result.sessions ?? [];
-      if (apiSessions.length === 0) return;
-      setSessions(prev => {
-        const existingNames = new Set(prev.map(s => s.name));
-        const incoming: LocalSession[] = apiSessions
-          .filter(s => !existingNames.has(s.name))
-          .map(s => ({
-            ...s,
-            state:             s.state      ?? 'STATE_UNSPECIFIED',
-            createTime:        s.createTime ?? new Date().toISOString(),
-            localDescription:  s.prompt     ?? s.title ?? '',
-            sourceDisplayName: s.sourceContext?.source ?? s.name,
-          }));
-        return incoming.length > 0 ? [...incoming, ...prev] : prev;
-      });
-    }).catch(() => {});
+    if (!initializedRef.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      julesService.writeSessions(sessions).catch(() => {});
+    }, 800);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [sessions]);
+
+  // Charge depuis le disque, puis fusionne avec l'API
+  useEffect(() => {
+    async function init() {
+      // 1. Disk first — instant display of previously known sessions
+      let diskSessions: LocalSession[] = [];
+      try { diskSessions = await julesService.readSessions(); } catch {}
+      if (diskSessions.length > 0) setSessions(diskSessions);
+      initializedRef.current = true;
+
+      // 2. Merge API sessions — add any unknowns at the top
+      try {
+        const result = await julesService.listSessions();
+        const apiSessions = result.sessions ?? [];
+        if (apiSessions.length === 0) return;
+        setSessions(prev => {
+          const existingNames = new Set(prev.map(s => s.name));
+          const incoming: LocalSession[] = apiSessions
+            .filter(s => !existingNames.has(s.name))
+            .map(s => ({
+              ...s,
+              state:             s.state      ?? 'STATE_UNSPECIFIED',
+              createTime:        s.createTime ?? new Date().toISOString(),
+              localDescription:  s.prompt     ?? s.title ?? '',
+              sourceDisplayName: s.sourceContext?.source ?? s.name,
+            }));
+          return incoming.length > 0 ? [...incoming, ...prev] : prev;
+        });
+      } catch {}
+    }
+    init();
   }, []);
 
   const fetchSources = useCallback(async () => {
@@ -79,6 +112,7 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
         sourceDisplayName: source ? sourceDisplayName(source) : req.sourceName,
       };
       setSessions(prev => [local, ...prev]);
+      julesService.appendLog(makeLogEntry(local, local.state)).catch(() => {});
     } catch (err: any) {
       setError(err?.message ?? 'Erreur lors du lancement');
     } finally {
@@ -90,10 +124,12 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       await julesService.approvePlan(sessionName);
-      // Mise à jour optimiste — le polling confirmera l'état réel
-      setSessions(prev => prev.map(s =>
-        s.name === sessionName ? { ...s, state: 'IN_PROGRESS' } : s
-      ));
+      setSessions(prev => prev.map(s => {
+        if (s.name !== sessionName) return s;
+        const updated = { ...s, state: 'IN_PROGRESS' as SessionState };
+        julesService.appendLog(makeLogEntry(updated, 'IN_PROGRESS')).catch(() => {});
+        return updated;
+      }));
     } catch (err: any) {
       setError(err?.message ?? 'Erreur lors de l\'approbation');
     }
@@ -119,9 +155,14 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
           const updated = await julesService.getSession(s.name);
           setSessions(prev => prev.map(existing => {
             if (existing.name !== s.name) return existing;
-            if (updated.state && updated.state !== existing.state && TERMINAL_STATES.includes(updated.state)) {
-              const title = updated.state === 'COMPLETED' ? '✓ Session terminée' : '✗ Session échouée';
-              julesService.notify(title, existing.localDescription).catch(() => {});
+            if (updated.state && updated.state !== existing.state) {
+              const merged = { ...existing, ...updated };
+              julesService.appendLog(makeLogEntry(merged, updated.state!)).catch(() => {});
+              if (TERMINAL_STATES.includes(updated.state)) {
+                const title = updated.state === 'COMPLETED' ? '✓ Session terminée' : '✗ Session échouée';
+                julesService.notify(title, existing.localDescription).catch(() => {});
+              }
+              return merged;
             }
             return { ...existing, ...updated };
           }));

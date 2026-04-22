@@ -4,6 +4,8 @@ import type {
   JulesSessionsResponse,
   ListActivitiesResponse,
   CreateSessionRequest,
+  LocalSession,
+  LogEntry,
 } from '../types/jules';
 
 export const julesService = {
@@ -38,4 +40,17 @@ export const julesService = {
 
   notify: (title: string, body: string): Promise<void> =>
     window.electronAPI.notify(title, body),
+
+  // Persistance locale
+  readSessions: (): Promise<LocalSession[]> =>
+    window.electronAPI.readSessions(),
+
+  writeSessions: (sessions: LocalSession[]): Promise<void> =>
+    window.electronAPI.writeSessions(sessions),
+
+  readLogs: (): Promise<LogEntry[]> =>
+    window.electronAPI.readLogs(),
+
+  appendLog: (entry: LogEntry): Promise<void> =>
+    window.electronAPI.appendLog(entry),
 };

@@ -108,6 +108,14 @@ export interface ListActivitiesResponse {
   nextPageToken?: string;
 }
 
+export interface LogEntry {
+  time:    string;
+  level:   'INFO' | 'WARN' | 'ERROR';
+  source:  string;
+  state:   string;
+  message: string;
+}
+
 export interface CreateSessionRequest {
   sourceName: string;
   description: string;

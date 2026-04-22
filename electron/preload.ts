@@ -18,4 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Système
   openExternal: (url: string)                 => ipcRenderer.invoke('shell:open-external', url),
   notify:       (title: string, body: string) => ipcRenderer.invoke('app:notify', title, body),
+  // Persistance locale
+  readSessions:   ()                       => ipcRenderer.invoke('store:read-sessions'),
+  writeSessions:  (sessions: unknown[])    => ipcRenderer.invoke('store:write-sessions', sessions),
+  readLogs:       ()                       => ipcRenderer.invoke('store:read-logs'),
+  appendLog:      (entry: unknown)         => ipcRenderer.invoke('store:append-log', entry),
 });

@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAgents } from '../context/AgentsContext';
 import { julesService } from '../services/julesService';
+import Pagination from '../components/Pagination';
+
+const PAGE_SIZE = 10;
 
 const ACTIVE_STATES = ['QUEUED', 'PLANNING', 'AWAITING_PLAN_APPROVAL', 'AWAITING_USER_FEEDBACK', 'IN_PROGRESS'];
 
@@ -46,6 +49,7 @@ export default function SessionsPage() {
   const [selectedSource, setSelectedSource] = useState('');
   const [description, setDescription]       = useState('');
   const [expandedName, setExpandedName]     = useState<string | null>(null);
+  const [page, setPage]                     = useState(1);
 
   const filtered = sessions.filter(s => {
     if (filter === 'active')    return ACTIVE_STATES.includes(s.state);
@@ -53,6 +57,10 @@ export default function SessionsPage() {
     if (filter === 'failed')    return s.state === 'FAILED';
     return true;
   });
+
+  useEffect(() => { setPage(1); }, [filter]);
+
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,6 +164,7 @@ export default function SessionsPage() {
             Aucune session
           </p>
         ) : (
+          <>
           <table>
             <thead>
               <tr>
@@ -166,10 +175,9 @@ export default function SessionsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(s => (
-                <>
+              {paginated.map(s => (
+                <React.Fragment key={s.name}>
                   <tr
-                    key={s.name}
                     onClick={() => setExpandedName(expandedName === s.name ? null : s.name)}
                     style={{ cursor: 'pointer' }}
                   >
@@ -217,10 +225,12 @@ export default function SessionsPage() {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onChange={setPage} />
+          </>
         )}
       </div>
     </div>
