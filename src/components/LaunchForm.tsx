@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useAgents } from '../context/AgentsContext';
 
 export default function LaunchForm() {
@@ -6,12 +6,11 @@ export default function LaunchForm() {
   const [selectedSource, setSelectedSource] = useState('');
   const [description, setDescription]       = useState('');
 
-  // Charge les sources automatiquement à l'affichage
   useEffect(() => {
     if (sources.length === 0) fetchSources();
-  }, []);
+  }, [fetchSources]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedSource || !description.trim()) return;
     await createSession({ sourceName: selectedSource, description: description.trim() });
