@@ -2,14 +2,12 @@ import { app, BrowserWindow, ipcMain, safeStorage, shell, Notification } from "e
 import * as path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
-import * as dotenv from "dotenv";
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const JULES_API_BASE = "https://jules.googleapis.com/v1alpha";
+const JULES_API_BASE      = "https://jules.googleapis.com/v1alpha";
+const SESSIONS_PAGE_SIZE  = 50;
 
 // ── API key storage ───────────────────────────────────────────────────────────
 
@@ -23,7 +21,7 @@ const encAvail = (): boolean => (_encAvail ??= safeStorage.isEncryptionAvailable
 // In-memory cache — invalidated on save/clear
 let cachedKey: string | null = null;
 
-function persistApiKey(key: string) {
+function persistApiKey(key: string): void {
   const data = encAvail() ? safeStorage.encryptString(key) : Buffer.from(key, "utf8");
   fs.writeFileSync(keyFile(), data);
 }
@@ -47,7 +45,7 @@ function getApiKey(): string {
 
 // ── Window ────────────────────────────────────────────────────────────────────
 
-function createWindow() {
+function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -72,7 +70,7 @@ function createWindow() {
 
 // ── Jules API helpers ─────────────────────────────────────────────────────────
 
-function julesHeaders() {
+function julesHeaders(): Record<string, string> {
   return {
     "x-goog-api-key": getApiKey(),
     "Content-Type": "application/json",
@@ -80,7 +78,7 @@ function julesHeaders() {
   };
 }
 
-async function julesRequest(url: string, options: RequestInit = {}) {
+async function julesRequest(url: string, options: RequestInit = {}): Promise<unknown> {
   const response = await fetch(url, {
     ...options,
     // Merge caller headers first so julesHeaders always wins
@@ -88,8 +86,8 @@ async function julesRequest(url: string, options: RequestInit = {}) {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const message = (errorData as any)?.error?.message || `Erreur API ${response.status}`;
+    const errorData = await response.json().catch(() => ({})) as { error?: { message?: string } };
+    const message = errorData?.error?.message ?? `Erreur API ${response.status}`;
     throw new Error(message);
   }
 
@@ -109,7 +107,7 @@ ipcMain.handle("auth:save-key", (_event, key: string) => {
 ipcMain.handle("auth:has-key", () => readApiKey().length > 0);
 
 ipcMain.handle("auth:clear-key", () => {
-  try { fs.unlinkSync(keyFile()); } catch (e: any) { if (e.code !== "ENOENT") throw e; }
+  try { fs.unlinkSync(keyFile()); } catch (e: unknown) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; }
   cachedKey = "";
 });
 
@@ -146,9 +144,12 @@ ipcMain.handle("jules:get-session", (_event, sessionName: string) =>
   julesRequest(`${JULES_API_BASE}/${sessionName}`)
 );
 
-ipcMain.handle("jules:list-sessions", () =>
-  julesRequest(`${JULES_API_BASE}/sessions`)
-);
+ipcMain.handle("jules:list-sessions", (_event, pageToken?: string) => {
+  const url = new URL(`${JULES_API_BASE}/sessions`);
+  url.searchParams.set("pageSize", String(SESSIONS_PAGE_SIZE));
+  if (pageToken) url.searchParams.set("pageToken", pageToken);
+  return julesRequest(url.toString());
+});
 
 ipcMain.handle("shell:open-external", (_event, url: string) =>
   shell.openExternal(url)

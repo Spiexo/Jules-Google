@@ -14,8 +14,8 @@ export const julesService = {
     window.electronAPI.getJulesSources(),
 
   // Sessions
-  listSessions: (): Promise<JulesSessionsResponse> =>
-    window.electronAPI.listJulesSessions(),
+  listSessions: (pageToken?: string): Promise<JulesSessionsResponse> =>
+    window.electronAPI.listJulesSessions(pageToken),
 
   getSession: (sessionName: string): Promise<JulesSession> =>
     window.electronAPI.getJulesSession(sessionName),

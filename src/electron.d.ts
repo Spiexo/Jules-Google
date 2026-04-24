@@ -18,7 +18,7 @@ declare global {
       clearApiKey: ()            => Promise<void>;
       // Jules — Sources & Sessions
       getJulesSources:    ()                              => Promise<JulesSourcesResponse>;
-      listJulesSessions:  ()                              => Promise<JulesSessionsResponse>;
+      listJulesSessions:  (pageToken?: string)             => Promise<JulesSessionsResponse>;
       getJulesSession:    (name: string)                  => Promise<JulesSession>;
       createJulesSession: (opts: CreateSessionRequest)    => Promise<JulesSession>;
       // Jules — Activités & Actions

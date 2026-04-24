@@ -8,9 +8,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearApiKey: ()            => ipcRenderer.invoke('auth:clear-key'),
   // Jules — Sources & Sessions
   getJulesSources:    ()           => ipcRenderer.invoke('jules:get-sources'),
-  listJulesSessions:  ()           => ipcRenderer.invoke('jules:list-sessions'),
+  listJulesSessions:  (pageToken?: string) => ipcRenderer.invoke('jules:list-sessions', pageToken),
   getJulesSession:    (name: string) => ipcRenderer.invoke('jules:get-session', name),
-  createJulesSession: (opts: any)    => ipcRenderer.invoke('jules:create-session', opts),
+  createJulesSession: (opts: unknown) => ipcRenderer.invoke('jules:create-session', opts),
   // Jules — Activités & Actions
   listJulesActivities: (sessionName: string)                 => ipcRenderer.invoke('jules:list-activities', sessionName),
   sendJulesMessage:    (sessionName: string, prompt: string) => ipcRenderer.invoke('jules:send-message', sessionName, prompt),

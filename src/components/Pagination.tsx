@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 function pageNumbers(current: number, total: number): (number | '...')[] {
   if (total <= 6) return Array.from({ length: total }, (_, i) => i + 1);
   const pages: (number | '...')[] = [1];
@@ -8,7 +10,7 @@ function pageNumbers(current: number, total: number): (number | '...')[] {
   return pages;
 }
 
-const BTN: React.CSSProperties = {
+const BTN: CSSProperties = {
   minWidth: 28,
   height: 28,
   padding: '0 6px',
@@ -24,14 +26,14 @@ const BTN: React.CSSProperties = {
   justifyContent: 'center',
 };
 
-const BTN_ACTIVE: React.CSSProperties = {
+const BTN_ACTIVE: CSSProperties = {
   ...BTN,
   background: 'var(--lime)',
   color: '#000',
   border: 'none',
 };
 
-const BTN_DISABLED: React.CSSProperties = {
+const BTN_DISABLED: CSSProperties = {
   ...BTN,
   opacity: 0.3,
   cursor: 'not-allowed',
