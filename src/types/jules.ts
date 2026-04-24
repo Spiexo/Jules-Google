@@ -50,10 +50,13 @@ export interface Artifact {
   media?: { mimeType: string; data: string };
 }
 
+export type LogLevel = 'INFO' | 'WARN' | 'ERROR';
+export type ActivityOriginator = 'user' | 'agent' | 'system';
+
 export interface Activity {
   name: string;
   id: string;
-  originator: 'user' | 'agent' | 'system';
+  originator: ActivityOriginator;
   description: string;
   createTime: string;
   artifacts?: Artifact[];
@@ -101,6 +104,7 @@ export interface LocalSession extends JulesSession {
 
 export interface JulesSessionsResponse {
   sessions: JulesSession[];
+  nextPageToken?: string;
 }
 
 export interface ListActivitiesResponse {
@@ -110,7 +114,7 @@ export interface ListActivitiesResponse {
 
 export interface LogEntry {
   time:    string;
-  level:   'INFO' | 'WARN' | 'ERROR';
+  level:   LogLevel;
   source:  string;
   state:   string;
   message: string;
