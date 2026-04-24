@@ -1,4 +1,5 @@
 import type { LocalSession } from '../types/jules';
+import { timeAgo } from '../utils/format';
 
 const STATUS: Record<string, { color: string; icon: string; label: string; spin?: boolean }> = {
   QUEUED:                 { color: '#a78bfa', icon: '◷', label: 'En file d\'attente', spin: true },
@@ -12,23 +13,9 @@ const STATUS: Record<string, { color: string; icon: string; label: string; spin?
   STATE_UNSPECIFIED:      { color: 'rgba(255,255,255,0.35)', icon: '?', label: 'Inconnu'         },
 };
 
-// Extrait 'Spiexo/TEST-Jules' depuis 'sources/github/Spiexo/TEST-Jules'
-function shortSourceName(resourceName: string): string {
-  const parts = resourceName.split('/');
-  return parts.length >= 4 ? `${parts[2]}/${parts[3]}` : resourceName;
-}
+interface SessionCardProps { session: LocalSession; }
 
-function timeAgo(isoDate?: string): string {
-  if (!isoDate) return 'à l\'instant';
-  const diff = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
-  if (isNaN(diff) || diff < 0) return 'à l\'instant';
-  if (diff < 60)   return `${diff}s`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}min`;
-  return `${Math.floor(diff / 3600)}h`;
-}
-
-export default function SessionCard({ session }: { session: LocalSession }) {
-  // On essaie notre mapping, sinon on affiche l'état brut de l'API
+export default function SessionCard({ session }: SessionCardProps) {
   const status = STATUS[session.state] ?? {
     color: 'rgba(255,255,255,0.35)',
     icon: '?',
@@ -49,7 +36,7 @@ export default function SessionCard({ session }: { session: LocalSession }) {
       {/* Header : repo + statut */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-          {shortSourceName(session.sourceDisplayName)}
+          {session.sourceDisplayName}
         </span>
         <span style={{ fontSize: '0.75rem', color: status.color, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
           <span style={{ display: 'inline-block', animation: status.spin ? 'spin 1.5s linear infinite' : 'none' }}>

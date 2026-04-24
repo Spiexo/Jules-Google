@@ -19,8 +19,8 @@ export default function SettingsPage() {
       setHasKey(true);
       setKeyInput('');
       setFeedback({ type: 'success', msg: 'Clé API sauvegardée et chiffrée avec succès.' });
-    } catch (err: any) {
-      setFeedback({ type: 'error', msg: err?.message ?? String(err) });
+    } catch (err: unknown) {
+      setFeedback({ type: 'error', msg: err instanceof Error ? err.message : String(err) });
     } finally {
       setSaving(false);
     }
@@ -32,8 +32,8 @@ export default function SettingsPage() {
       setHasKey(false);
       setKeyInput('');
       setFeedback({ type: 'success', msg: 'Clé API supprimée.' });
-    } catch (err: any) {
-      setFeedback({ type: 'error', msg: err?.message ?? 'Erreur lors de la suppression.' });
+    } catch (err: unknown) {
+      setFeedback({ type: 'error', msg: err instanceof Error ? err.message : 'Erreur lors de la suppression.' });
     }
   };
 
