@@ -3,10 +3,10 @@ import { useAgents } from '../context/AgentsContext';
 import { julesService } from '../services/julesService';
 import type { LocalSession } from '../types/jules';
 import Pagination from '../components/Pagination';
+import { ACTIVE_STATES } from '../constants/session';
+import { timeAgo } from '../utils/format';
 
 const PR_PAGE_SIZE = 5;
-
-const ACTIVE_STATES = ['QUEUED', 'PLANNING', 'AWAITING_PLAN_APPROVAL', 'AWAITING_USER_FEEDBACK', 'IN_PROGRESS'];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -29,28 +29,18 @@ function getLast7DayLabels(): string[] {
   });
 }
 
-function timeAgo(iso?: string): string {
-  if (!iso) return '—';
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (isNaN(diff) || diff < 0) return 'à l\'instant';
-  if (diff < 60)   return `${diff}s`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}min`;
-  return `${Math.floor(diff / 3600)}h`;
-}
-
 function buildPRList(sessions: LocalSession[]) {
-  return sessions
-    .filter(s => s.outputs?.some(o => o.pullRequest))
-    .map(s => {
-      const pr = s.outputs!.find(o => o.pullRequest)!.pullRequest!;
-      return {
-        title:  pr.title || s.title || s.localDescription,
-        repo:   s.sourceDisplayName,
-        url:    pr.url,
-        time:   s.updateTime || s.createTime,
-        state:  s.state,
-      };
-    });
+  return sessions.flatMap(s => {
+    const pr = s.outputs?.find(o => o.pullRequest)?.pullRequest;
+    if (!pr) return [];
+    return [{
+      title: pr.title || s.title || s.localDescription,
+      repo:  s.sourceDisplayName,
+      url:   pr.url,
+      time:  s.updateTime || s.createTime,
+      state: s.state,
+    }];
+  });
 }
 
 const PR_BADGE: Record<string, string> = {
@@ -147,29 +137,29 @@ export default function DashboardPage() {
           accent="var(--cyan)"
           sub={active.length > 0 ? '● En cours' : 'Aucune'}
         />
-        <StatCard
-          label="Terminées aujourd'hui"
-          value={completedToday.length}
-          accent="var(--lime)"
-        />
+        <div className="card" style={{ flex: 1 }}>
+          <p style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+            Terminées aujourd'hui
+          </p>
+          <p style={{ fontSize: 28, fontWeight: 700, color: 'var(--lime)', letterSpacing: '-0.02em' }}>
+            {completedToday.length}
+            <span style={{ fontSize: 16, color: 'var(--muted)', fontWeight: 400 }}> / 15</span>
+          </p>
+          <div style={{ marginTop: 8, height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${Math.min((completedToday.length / 15) * 100, 100)}%`, background: 'var(--lime)', borderRadius: 2 }} />
+          </div>
+        </div>
         <StatCard
           label="PRs ouvertes"
           value={openPRs.length}
           accent="var(--cyan)"
           sub={prs.length > 0 ? `${prs.length} PR${prs.length > 1 ? 's' : ''} au total` : undefined}
         />
-        <div className="card" style={{ flex: 1 }}>
-          <p style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-            Sessions totales
-          </p>
-          <p style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
-            {sessions.length}
-            <span style={{ fontSize: 16, color: 'var(--muted)', fontWeight: 400 }}> / 15</span>
-          </p>
-          <div style={{ marginTop: 8, height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${Math.min((sessions.length / 15) * 100, 100)}%`, background: 'var(--lime)', borderRadius: 2 }} />
-          </div>
-        </div>
+        <StatCard
+          label="Sessions totales"
+          value={sessions.length}
+          accent="var(--text)"
+        />
       </div>
 
       {/* Chart + Active agents */}

@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
-import type { JulesSource, LocalSession, CreateSessionRequest, SessionState, LogEntry } from '../types/jules';
+import type { JulesSource, JulesSession, LocalSession, CreateSessionRequest, SessionState, LogEntry } from '../types/jules';
 import { julesService } from '../services/julesService';
+import { ACTIVE_STATES } from '../constants/session';
+import { normalizeSourceName } from '../utils/format';
 
 interface AgentsContextValue {
   sources:              JulesSource[];
@@ -16,7 +18,6 @@ interface AgentsContextValue {
 
 const AgentsContext = createContext<AgentsContextValue | null>(null);
 
-const ACTIVE_STATES: SessionState[]   = ['QUEUED', 'PLANNING', 'AWAITING_PLAN_APPROVAL', 'AWAITING_USER_FEEDBACK', 'IN_PROGRESS'];
 const TERMINAL_STATES: SessionState[] = ['COMPLETED', 'FAILED'];
 
 function sourceDisplayName(source: JulesSource): string {
@@ -59,13 +60,21 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
       // 1. Disk first — instant display of previously known sessions
       let diskSessions: LocalSession[] = [];
       try { diskSessions = await julesService.readSessions(); } catch {}
+      // Normalize any old-format source names stored on disk (e.g. 'sources/github/owner/repo')
+      diskSessions = diskSessions.map(s => ({ ...s, sourceDisplayName: normalizeSourceName(s.sourceDisplayName) }));
       if (diskSessions.length > 0) setSessions(diskSessions);
       initializedRef.current = true;
 
-      // 2. Merge API sessions — add any unknowns at the top
+      // 2. Fetch ALL pages from the API and merge unknowns
       try {
-        const result = await julesService.listSessions();
-        const apiSessions = result.sessions ?? [];
+        const apiSessions: JulesSession[] = [];
+        let pageToken: string | undefined;
+        do {
+          const result = await julesService.listSessions(pageToken);
+          apiSessions.push(...(result.sessions ?? []));
+          pageToken = result.nextPageToken;
+        } while (pageToken);
+
         if (apiSessions.length === 0) return;
         setSessions(prev => {
           const existingNames = new Set(prev.map(s => s.name));
@@ -76,7 +85,7 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
               state:             s.state      ?? 'STATE_UNSPECIFIED',
               createTime:        s.createTime ?? new Date().toISOString(),
               localDescription:  s.prompt     ?? s.title ?? '',
-              sourceDisplayName: s.sourceContext?.source ?? s.name,
+              sourceDisplayName: normalizeSourceName(s.sourceContext?.source ?? s.name),
             }));
           return incoming.length > 0 ? [...incoming, ...prev] : prev;
         });
@@ -91,8 +100,8 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
     try {
       const result = await julesService.getSources();
       setSources(result.sources ?? []);
-    } catch (err: any) {
-      setError(err?.message ?? 'Erreur inconnue');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoadingSources(false);
     }
@@ -113,8 +122,8 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
       };
       setSessions(prev => [local, ...prev]);
       julesService.appendLog(makeLogEntry(local, local.state)).catch(() => {});
-    } catch (err: any) {
-      setError(err?.message ?? 'Erreur lors du lancement');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erreur lors du lancement');
     } finally {
       setCreating(false);
     }
@@ -130,8 +139,8 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
         julesService.appendLog(makeLogEntry(updated, 'IN_PROGRESS')).catch(() => {});
         return updated;
       }));
-    } catch (err: any) {
-      setError(err?.message ?? 'Erreur lors de l\'approbation');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de l\'approbation');
     }
   }, []);
 
@@ -139,8 +148,8 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       await julesService.sendMessage(sessionName, prompt);
-    } catch (err: any) {
-      setError(err?.message ?? 'Erreur lors de l\'envoi du message');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de l\'envoi du message');
     }
   }, []);
 
