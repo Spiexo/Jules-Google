@@ -1,17 +1,16 @@
-type Page = 'dashboard' | 'sessions' | 'agents' | 'logs' | 'settings';
+import type { Page } from '../App';
 
 interface NavItem { id: Page; icon: string; label: string; }
 
 const NAV: NavItem[] = [
-  { id: 'dashboard', icon: '▣',  label: 'Dashboard'  },
-  { id: 'sessions',  icon: '⚡', label: 'Sessions'   },
-  { id: 'agents',    icon: '🤖', label: 'Agents'     },
-  { id: 'logs',      icon: '▤',  label: 'Logs'       },
+  { id: 'dashboard', icon: '▣',  label: 'Dashboard' },
+  { id: 'sessions',  icon: '◈',  label: 'Sessions'  },
+  { id: 'logs',      icon: '▤',  label: 'Logs'      },
 ];
 
-interface Props { active: Page; onNavigate: (p: Page) => void; }
+interface SidebarProps { active: Page; onNavigate: (p: Page) => void; }
 
-export default function Sidebar({ active, onNavigate }: Props) {
+export default function Sidebar({ active, onNavigate }: SidebarProps) {
   return (
     <aside style={{
       width: 220,
@@ -25,7 +24,7 @@ export default function Sidebar({ active, onNavigate }: Props) {
       {/* Logo */}
       <div style={{ padding: '0 1.25rem 1.5rem', borderBottom: '1px solid var(--border)', marginBottom: '0.75rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: 18, color: 'var(--lime)', lineHeight: 1 }}>⚡</span>
+          <span style={{ fontSize: 18, color: 'var(--lime)', lineHeight: 1 }}>◪</span>
           <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em', color: 'var(--text)' }}>
             Jules Controller
           </span>

@@ -1,238 +1,578 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAgents } from '../context/AgentsContext';
 import { julesService } from '../services/julesService';
+import type { AutomationMode, LocalSession } from '../types/jules';
 import Pagination from '../components/Pagination';
+import { ACTIVE_STATES, STATE_LABEL } from '../constants/session';
+import { timeAgo } from '../utils/format';
 
-const PAGE_SIZE = 10;
-
-const ACTIVE_STATES = ['QUEUED', 'PLANNING', 'AWAITING_PLAN_APPROVAL', 'AWAITING_USER_FEEDBACK', 'IN_PROGRESS'];
+const SESSIONS_PAGE_SIZE = 10;
 
 const STATE_BADGE: Record<string, string> = {
-  QUEUED:                 'badge-purple',
+  QUEUED:                 'badge-cyan',
   PLANNING:               'badge-cyan',
+  IN_PROGRESS:            'badge-lime',
   AWAITING_PLAN_APPROVAL: 'badge-orange',
   AWAITING_USER_FEEDBACK: 'badge-orange',
-  IN_PROGRESS:            'badge-cyan',
-  PAUSED:                 'badge-gray',
   COMPLETED:              'badge-lime',
   FAILED:                 'badge-red',
+  PAUSED:                 'badge-gray',
   STATE_UNSPECIFIED:      'badge-gray',
 };
 
-const STATE_LABEL: Record<string, string> = {
-  QUEUED:                 'En file',
-  PLANNING:               'Planification',
-  AWAITING_PLAN_APPROVAL: 'Plan à approuver',
-  AWAITING_USER_FEEDBACK: 'Retour requis',
-  IN_PROGRESS:            'En cours',
-  PAUSED:                 'En pause',
-  COMPLETED:              'Terminé',
-  FAILED:                 'Échec',
-  STATE_UNSPECIFIED:      'Inconnu',
-};
-
-function timeAgo(isoDate?: string): string {
-  if (!isoDate) return 'à l\'instant';
-  const diff = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
-  if (isNaN(diff) || diff < 0) return 'à l\'instant';
-  if (diff < 60)   return `${diff}s`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}min`;
-  return `${Math.floor(diff / 3600)}h`;
+function setAutomationMode(sourceId: string, mode: AutomationMode) {
+  localStorage.setItem(`jules_automation_${sourceId}`, mode);
 }
 
-type Filter = 'all' | 'active' | 'completed' | 'failed';
+interface ImageAttachButtonProps { onSelect: (file: File, preview: string) => void; }
 
-export default function SessionsPage() {
-  const { sessions, sources, loadingSources, creatingSession, error, fetchSources, createSession } = useAgents();
-  const [filter, setFilter]                 = useState<Filter>('all');
-  const [showNew, setShowNew]               = useState(false);
-  const [selectedSource, setSelectedSource] = useState('');
-  const [description, setDescription]       = useState('');
-  const [expandedName, setExpandedName]     = useState<string | null>(null);
-  const [page, setPage]                     = useState(1);
+function ImageAttachButton({ onSelect }: ImageAttachButtonProps) {
+  const [open, setOpen]   = useState(false);
+  const fileRef           = useRef<HTMLInputElement>(null);
+  const wrapRef           = useRef<HTMLDivElement>(null);
 
-  const filtered = sessions.filter(s => {
-    if (filter === 'active')    return ACTIVE_STATES.includes(s.state);
-    if (filter === 'completed') return s.state === 'COMPLETED';
-    if (filter === 'failed')    return s.state === 'FAILED';
-    return true;
-  });
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
-  useEffect(() => { setPage(1); }, [filter]);
-
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedSource || !description.trim()) return;
-    await createSession({ sourceName: selectedSource, description: description.trim() });
-    setDescription('');
-    setShowNew(false);
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { onSelect(file, reader.result as string); setOpen(false); };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
-  const FILTERS: { id: Filter; label: string; count: number }[] = [
-    { id: 'all',       label: 'Tout',      count: sessions.length },
-    { id: 'active',    label: 'Actives',   count: sessions.filter(s => ACTIVE_STATES.includes(s.state)).length },
-    { id: 'completed', label: 'Terminées', count: sessions.filter(s => s.state === 'COMPLETED').length },
-    { id: 'failed',    label: 'Échecs',    count: sessions.filter(s => s.state === 'FAILED').length },
-  ];
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: 30, height: 30,
+          borderRadius: 8,
+          border: '1px solid var(--border)',
+          background: open ? 'var(--s2)' : 'transparent',
+          color: 'var(--muted)',
+          fontSize: 18, lineHeight: 1,
+          cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+        title="Joindre une image"
+      >
+        +
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute',
+          bottom: 'calc(100% + 6px)',
+          left: 0,
+          background: 'var(--s1)',
+          border: '1px solid var(--border)',
+          borderRadius: 10,
+          padding: '0.35rem 0',
+          minWidth: 180,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+          zIndex: 50,
+        }}>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: '0.5rem 0.85rem',
+              background: 'transparent', color: 'var(--text)',
+              fontSize: 13, textAlign: 'left', cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: 16 }}>🖼</span>
+            Importer une image
+          </button>
+        </div>
+      )}
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleFile}
+      />
+    </div>
+  );
+}
+
+function SessionRow({ session, onApprove, onReply, onView }: {
+  session: LocalSession;
+  onApprove: () => void;
+  onReply: () => void;
+  onView: () => void;
+}) {
+  const pr = session.outputs?.[0]?.pullRequest;
+  const isActive = ACTIVE_STATES.includes(session.state);
+
+  return (
+    <div style={{
+      padding: '0.85rem 1rem',
+      borderBottom: '1px solid var(--border)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '1rem',
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontWeight: 500, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {session.title || session.localDescription}
+        </p>
+        {session.title && (
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {session.localDescription}
+          </p>
+        )}
+      </div>
+
+      <span className={`badge ${STATE_BADGE[session.state] ?? 'badge-gray'}`}>
+        {isActive && session.state !== 'AWAITING_PLAN_APPROVAL' && session.state !== 'AWAITING_USER_FEEDBACK' && (
+          <span className="pulse">●</span>
+        )}
+        {STATE_LABEL[session.state] ?? session.state}
+      </span>
+
+      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        {session.state === 'AWAITING_PLAN_APPROVAL' && (
+          <button className="btn-primary" style={{ fontSize: 11, padding: '0.25rem 0.65rem' }} onClick={onApprove}>
+            ✓ Approuver
+          </button>
+        )}
+        <button className="btn-ghost" style={{ fontSize: 11, padding: '0.25rem 0.65rem' }} onClick={onView}>
+          → Voir
+        </button>
+        {isActive && (
+          <button className="btn-ghost" style={{ fontSize: 11, padding: '0.25rem 0.65rem' }} onClick={onReply}>
+            ✉ Répondre
+          </button>
+        )}
+        {pr && (
+          <button
+            className="btn-ghost"
+            style={{ fontSize: 11, padding: '0.25rem 0.65rem' }}
+            onClick={() => julesService.openExternal(pr.url)}
+          >
+            ↗ PR
+          </button>
+        )}
+        {session.url && (
+          <button
+            className="btn-ghost"
+            style={{ fontSize: 11, padding: '0.25rem 0.65rem' }}
+            onClick={() => session.url && julesService.openExternal(session.url)}
+          >
+            ↗ Jules
+          </button>
+        )}
+      </div>
+
+      <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, width: 48, textAlign: 'right' }}>
+        {timeAgo(session.createTime)}
+      </span>
+    </div>
+  );
+}
+
+export default function SessionsPage({ onSelectSession }: { onSelectSession: (name: string) => void }) {
+  const { sources, sessions, loadingSources, creatingSession, error, fetchSources, createSession, approveSessionPlan, sendSessionMessage } = useAgents();
+
+  const [selectedSource, setSelectedSource]   = useState<string | null>(null);
+  const [replySession, setReplySession]        = useState<string | null>(null);
+  const [replyText, setReplyText]              = useState('');
+  const [replyImage, setReplyImage]            = useState<{ file: File; preview: string } | null>(null);
+  const [replySending, setReplySending]        = useState(false);
+  const [showModal, setShowModal]              = useState(false);
+  const [automationModes, setAutomationModes] = useState<Record<string, AutomationMode>>(() => {
+    const result: Record<string, AutomationMode> = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('jules_automation_')) {
+        const sourceId = key.replace('jules_automation_', '');
+        result[sourceId] = localStorage.getItem(key) as AutomationMode;
+      }
+    }
+    return result;
+  });
+
+  const [modalSource, setModalSource]           = useState('');
+  const [modalBranch, setModalBranch]           = useState('');
+  const [modalPrompt, setModalPrompt]           = useState('');
+  const [modalTitle, setModalTitle]             = useState('');
+  const [modalRequirePlan, setModalRequirePlan] = useState(false);
+  const [modalImage, setModalImage]             = useState<{ file: File; preview: string } | null>(null);
+
+  useEffect(() => {
+    if (sources.length === 0) fetchSources();
+  }, [fetchSources]);
+
+  useEffect(() => {
+    if (selectedSource && showModal) setModalSource(selectedSource);
+  }, [selectedSource, showModal]);
+
+  useEffect(() => {
+    const src = sources.find(s => s.name === modalSource);
+    const defaultBranch = src?.githubRepo?.defaultBranch?.displayName ?? 'main';
+    setModalBranch(defaultBranch);
+  }, [modalSource, sources]);
+
+  function displayNameFor(sourceName: string): string {
+    const src = sources.find(s => s.name === sourceName);
+    return src?.githubRepo ? `${src.githubRepo.owner}/${src.githubRepo.repo}` : sourceName;
+  }
+
+  const filteredSessions = selectedSource
+    ? sessions.filter(s => s.sourceContext?.source === selectedSource || s.sourceDisplayName === displayNameFor(selectedSource))
+    : sessions;
+
+  const [sessionsPage, setSessionsPage] = useState(1);
+  useEffect(() => { setSessionsPage(1); }, [selectedSource]);
+  const paginatedSessions = filteredSessions.slice((sessionsPage - 1) * SESSIONS_PAGE_SIZE, sessionsPage * SESSIONS_PAGE_SIZE);
+
+  const handleApprove = async (sessionName: string) => {
+    await approveSessionPlan(sessionName);
+  };
+
+  const handleReply = async (sessionName: string) => {
+    if (!replyText.trim()) return;
+    setReplySending(true);
+    await sendSessionMessage(sessionName, replyText.trim());
+    setReplyText('');
+    setReplyImage(null);
+    setReplySession(null);
+    setReplySending(false);
+  };
+
+  const handleModalSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!modalSource || !modalPrompt.trim()) return;
+    const src = sources.find(s => s.name === modalSource);
+    const automationMode = src ? (automationModes[src.id] ?? 'AUTOMATION_MODE_UNSPECIFIED') : 'AUTOMATION_MODE_UNSPECIFIED';
+    await createSession({
+      sourceName:          modalSource,
+      description:         modalPrompt.trim(),
+      startingBranch:      modalBranch || 'main',
+      requirePlanApproval: modalRequirePlan,
+      automationMode,
+      ...(modalTitle.trim() && { title: modalTitle.trim() }),
+    });
+    setShowModal(false);
+    setModalPrompt('');
+    setModalTitle('');
+    setModalRequirePlan(false);
+    setModalImage(null);
+  };
+
+  const modalSrc     = sources.find(s => s.name === modalSource);
+  const modalBranches = modalSrc?.githubRepo?.branches ?? [];
 
   return (
     <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 1100 }}>
 
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>Sessions</h1>
-          <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>Gérez vos sessions d'agents Jules</p>
+          <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>Dépôts GitHub connectés à Jules</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowNew(v => !v)}>
-          {showNew ? '✕ Annuler' : '+ Nouvelle session'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn-ghost" onClick={fetchSources} disabled={loadingSources}>
+            {loadingSources ? '...' : '↻ Actualiser'}
+          </button>
+          <button className="btn-primary" onClick={() => setShowModal(true)}>
+            + Nouvelle session
+          </button>
+        </div>
       </div>
 
-      {/* New session panel */}
-      {showNew && (
-        <div className="card">
-          <p style={{ fontWeight: 600, marginBottom: '1rem' }}>Lancer un nouvel agent</p>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <select
-                value={selectedSource}
-                onChange={e => setSelectedSource(e.target.value)}
-                disabled={loadingSources}
-                style={{ flex: 1 }}
+      {error && (
+        <p style={{ fontSize: 12, color: 'var(--red)', padding: '0.5rem 0.75rem', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>
+          ✗ {error}
+        </p>
+      )}
+
+      {!loadingSources && sources.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>Aucun dépôt connecté</p>
+          <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>
+            Configurez votre clé API dans les paramètres puis actualisez
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
+          {sources.map(source => {
+            const displayName    = source.githubRepo
+              ? `${source.githubRepo.owner}/${source.githubRepo.repo}`
+              : source.id || source.name;
+            const sourceSessions = sessions.filter(s => s.sourceContext?.source === source.name || s.sourceDisplayName === displayName);
+            const activeSessions = sourceSessions.filter(s => ACTIVE_STATES.includes(s.state));
+            const isSelected     = selectedSource === source.name;
+            const isAutoOn       = (automationModes[source.id] ?? 'AUTOMATION_MODE_UNSPECIFIED') === 'AUTO_CREATE_PR';
+
+            return (
+              <div
+                key={source.name}
+                onClick={() => setSelectedSource(isSelected ? null : source.name)}
+                style={{
+                  padding: '1rem',
+                  borderRadius: 12,
+                  border: `1px solid ${isSelected ? 'var(--lime)' : 'var(--border)'}`,
+                  background: isSelected ? 'rgba(163,230,53,0.05)' : 'var(--s1)',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}
               >
-                <option value="" disabled>
-                  {loadingSources ? 'Chargement...' : sources.length === 0 ? 'Aucune source' : 'Sélectionner un dépôt'}
-                </option>
-                {sources.map(s => (
-                  <option key={s.name} value={s.name}>
-                    {s.githubRepo ? `${s.githubRepo.owner}/${s.githubRepo.repo}` : s.id || s.name}
-                  </option>
-                ))}
-              </select>
-              <button type="button" className="btn-ghost" onClick={fetchSources} disabled={loadingSources}>
-                {loadingSources ? '...' : '↻'}
-              </button>
-            </div>
-            <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Décris la tâche à effectuer..."
-              rows={3}
-            />
-            {error && <p style={{ fontSize: 12, color: 'var(--red)', margin: 0 }}>✗ {error}</p>}
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={!selectedSource || !description.trim() || creatingSession}
-              style={{ alignSelf: 'flex-start' }}
-            >
-              {creatingSession ? '⟳ Lancement...' : '⚡ Lancer'}
-            </button>
-          </form>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {displayName}
+                    </p>
+                    {source.githubRepo?.defaultBranch && (
+                      <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2, fontFamily: 'monospace' }}>
+                        ⎇ {source.githubRepo.defaultBranch.displayName}
+                      </p>
+                    )}
+                  </div>
+                  {activeSessions.length > 0
+                    ? <span className="badge badge-cyan" style={{ flexShrink: 0 }}><span className="pulse">●</span> {activeSessions.length}</span>
+                    : <span className="badge badge-gray" style={{ flexShrink: 0 }}>{sourceSessions.length}</span>
+                  }
+                </div>
+
+                <div
+                  onClick={e => {
+                    e.stopPropagation();
+                    const next: AutomationMode = isAutoOn ? 'AUTOMATION_MODE_UNSPECIFIED' : 'AUTO_CREATE_PR';
+                    setAutomationMode(source.id, next);
+                    setAutomationModes(prev => ({ ...prev, [source.id]: next }));
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}
+                >
+                  <div style={{
+                    width: 28,
+                    height: 16,
+                    borderRadius: 8,
+                    background: isAutoOn ? 'var(--lime)' : 'var(--border)',
+                    position: 'relative',
+                    flexShrink: 0,
+                    transition: 'background 0.2s',
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      top: 2,
+                      left: isAutoOn ? 14 : 2,
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      background: isAutoOn ? '#000' : '#555',
+                      transition: 'left 0.2s',
+                    }} />
+                  </div>
+                  <span style={{ fontSize: 11, color: isAutoOn ? 'var(--lime)' : 'var(--muted)' }}>
+                    Auto-PR
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Filter pills */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        {FILTERS.map(f => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            style={{
-              padding: '0.3rem 0.85rem',
-              borderRadius: 99,
-              fontSize: 12,
-              fontWeight: 500,
-              background: filter === f.id ? 'var(--lime)' : 'transparent',
-              color:      filter === f.id ? '#000'       : 'var(--muted)',
-              border:     filter === f.id ? 'none'       : '1px solid var(--border)',
-            }}
-          >
-            {f.label}
-            <span style={{ marginLeft: 6, opacity: 0.7 }}>{f.count}</span>
-          </button>
-        ))}
-      </div>
+      {(sources.length > 0 || sessions.length > 0) && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <p style={{ fontWeight: 600, fontSize: 13 }}>
+              {selectedSource ? `Sessions — ${displayNameFor(selectedSource)}` : 'Toutes les sessions'}
+            </p>
+            {selectedSource && (
+              <button className="btn-ghost" style={{ fontSize: 11, padding: '0.2rem 0.6rem' }} onClick={() => setSelectedSource(null)}>
+                ✕ Effacer le filtre
+              </button>
+            )}
+          </div>
 
-      {/* Sessions table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {filtered.length === 0 ? (
-          <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '3rem', fontSize: 13 }}>
-            Aucune session
-          </p>
-        ) : (
-          <>
-          <table>
-            <thead>
-              <tr>
-                <th>Dépôt</th>
-                <th>Tâche</th>
-                <th>Statut</th>
-                <th>Lancée</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map(s => (
-                <React.Fragment key={s.name}>
-                  <tr
-                    onClick={() => setExpandedName(expandedName === s.name ? null : s.name)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 500 }}>{s.sourceDisplayName}</td>
-                    <td style={{ maxWidth: 340, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--muted)' }}>
-                      {s.localDescription}
-                    </td>
-                    <td>
-                      <span className={`badge ${STATE_BADGE[s.state] ?? 'badge-gray'}`}>
-                        {ACTIVE_STATES.includes(s.state) && <span className="pulse">●</span>}
-                        {STATE_LABEL[s.state] ?? s.state}
-                      </span>
-                    </td>
-                    <td style={{ color: 'var(--muted)', fontSize: 12 }}>il y a {timeAgo(s.createTime)}</td>
-                  </tr>
+          {filteredSessions.length === 0 ? (
+            <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '2.5rem', fontSize: 13 }}>
+              Aucune session
+            </p>
+          ) : (
+            paginatedSessions.map(s => (
+              <div key={s.name}>
+                <SessionRow
+                  session={s}
+                  onApprove={() => handleApprove(s.name)}
+                  onReply={() => setReplySession(replySession === s.name ? null : s.name)}
+                  onView={() => onSelectSession(s.name)}
+                />
+                {replySession === s.name && (
+                  <div style={{ padding: '0.75rem 1rem', background: 'var(--s2)', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {replyImage && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <img
+                          src={replyImage.preview}
+                          alt={replyImage.file.name}
+                          style={{ height: 48, borderRadius: 6, border: '1px solid var(--border)', objectFit: 'cover' }}
+                        />
+                        <span style={{ fontSize: 12, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {replyImage.file.name}
+                        </span>
+                        <button
+                          className="btn-ghost"
+                          style={{ fontSize: 11, padding: '0.1rem 0.4rem' }}
+                          onClick={() => setReplyImage(null)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <ImageAttachButton onSelect={(file, preview) => setReplyImage({ file, preview })} />
+                      <input
+                        autoFocus
+                        value={replyText}
+                        onChange={e => setReplyText(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleReply(s.name)}
+                        placeholder="Votre réponse à Jules..."
+                        style={{ flex: 1, fontSize: 13 }}
+                      />
+                      <button
+                        className="btn-primary"
+                        style={{ fontSize: 12 }}
+                        disabled={!replyText.trim() || replySending}
+                        onClick={() => handleReply(s.name)}
+                      >
+                        {replySending ? '...' : 'Envoyer'}
+                      </button>
+                      <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => { setReplySession(null); setReplyImage(null); }}>
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+          <Pagination page={sessionsPage} pageSize={SESSIONS_PAGE_SIZE} total={filteredSessions.length} onChange={setSessionsPage} />
+        </div>
+      )}
 
-                  {/* Detail panel */}
-                  {expandedName === s.name && (
-                    <tr key={`${s.name}-detail`}>
-                      <td colSpan={4} style={{ background: 'var(--s2)', padding: '1rem 1.25rem' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {showModal && (
+        <div
+          onClick={e => e.target === e.currentTarget && setShowModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+          }}
+        >
+          <div className="card" style={{ width: 480, maxWidth: '90vw' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <p style={{ fontWeight: 700, fontSize: 15 }}>Nouvelle session</p>
+              <button className="btn-ghost" style={{ padding: '0.2rem 0.5rem', fontSize: 14 }} onClick={() => setShowModal(false)}>✕</button>
+            </div>
 
-                          {/* Full description */}
-                          <p style={{ fontSize: 13, color: 'var(--text)' }}>{s.localDescription}</p>
+            <form onSubmit={handleModalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-                          {/* Metadata */}
-                          <div style={{ display: 'flex', gap: '1.5rem', fontSize: 11, color: 'var(--muted)' }}>
-                            {s.id && <span>ID: <span style={{ fontFamily: 'monospace', color: 'var(--text)' }}>{s.id}</span></span>}
-                            {s.updateTime && <span>Mis à jour: {new Date(s.updateTime).toLocaleString('fr-FR')}</span>}
-                          </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Dépôt</label>
+                <select value={modalSource} onChange={e => setModalSource(e.target.value)} style={{ width: '100%' }}>
+                  <option value="" disabled>Sélectionner un dépôt</option>
+                  {sources.map(s => (
+                    <option key={s.name} value={s.name}>
+                      {s.githubRepo ? `${s.githubRepo.owner}/${s.githubRepo.repo}` : s.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                          {/* Actions */}
-                          {s.url && (
-                            <div style={{ marginTop: 4 }}>
-                              <button
-                                className="btn-ghost"
-                                onClick={() => julesService.openExternal(s.url!)}
-                                style={{ fontSize: 12, padding: '0.35rem 0.8rem' }}
-                              >
-                                ↗ Ouvrir dans Jules
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onChange={setPage} />
-          </>
-        )}
-      </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Branche de départ</label>
+                {modalBranches.length > 0 ? (
+                  <select value={modalBranch} onChange={e => setModalBranch(e.target.value)} style={{ width: '100%' }}>
+                    {modalBranches.map(b => (
+                      <option key={b.displayName} value={b.displayName}>{b.displayName}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input value={modalBranch} onChange={e => setModalBranch(e.target.value)} placeholder="main" />
+                )}
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
+                  Titre <span style={{ opacity: 0.5 }}>(optionnel)</span>
+                </label>
+                <input value={modalTitle} onChange={e => setModalTitle(e.target.value)} placeholder="Ex : Ajouter des tests d'intégration" />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Tâche à effectuer <span style={{ color: 'var(--red)' }}>*</span></label>
+                <textarea
+                  value={modalPrompt}
+                  onChange={e => setModalPrompt(e.target.value)}
+                  placeholder="Décris précisément ce que Jules doit faire..."
+                  rows={4}
+                />
+                {modalImage && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                    <img
+                      src={modalImage.preview}
+                      alt={modalImage.file.name}
+                      style={{ height: 48, borderRadius: 6, border: '1px solid var(--border)', objectFit: 'cover' }}
+                    />
+                    <span style={{ fontSize: 12, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {modalImage.file.name}
+                    </span>
+                    <button type="button" className="btn-ghost" style={{ fontSize: 11, padding: '0.1rem 0.4rem' }} onClick={() => setModalImage(null)}>✕</button>
+                  </div>
+                )}
+                <div style={{ marginTop: 8 }}>
+                  <ImageAttachButton onSelect={(file, preview) => setModalImage({ file, preview })} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={modalRequirePlan}
+                    onChange={e => setModalRequirePlan(e.target.checked)}
+                    style={{ width: 'auto', cursor: 'pointer' }}
+                  />
+                  Approbation du plan requise
+                </label>
+              </div>
+
+              {error && <p style={{ fontSize: 12, color: 'var(--red)' }}>✗ {error}</p>}
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+                <button type="button" className="btn-ghost" onClick={() => { setShowModal(false); setModalImage(null); }}>Annuler</button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={!modalSource || !modalPrompt.trim() || creatingSession}
+                >
+                  {creatingSession ? '⟳ Lancement...' : '⚡ Lancer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
