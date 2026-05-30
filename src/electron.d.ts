@@ -22,17 +22,20 @@ declare global {
       getJulesSession:    (name: string)                  => Promise<JulesSession>;
       createJulesSession: (opts: CreateSessionRequest)    => Promise<JulesSession>;
       // Jules — Activités & Actions
-      listJulesActivities: (sessionName: string)                  => Promise<ListActivitiesResponse>;
+      listJulesActivities: (sessionName: string, pageToken?: string) => Promise<ListActivitiesResponse>;
       sendJulesMessage:    (sessionName: string, prompt: string)   => Promise<void>;
       approveJulesPlan:    (sessionName: string)                   => Promise<void>;
       // Système
       openExternal: (url: string)                  => Promise<void>;
       notify:       (title: string, body: string)  => Promise<void>;
+      openImageDialog: ()                          => Promise<{ name: string; preview: string } | null>;
       // Persistance locale
       readSessions:  ()                        => Promise<LocalSession[]>;
       writeSessions: (sessions: LocalSession[]) => Promise<void>;
       readLogs:      ()                        => Promise<LogEntry[]>;
       appendLog:     (entry: LogEntry)         => Promise<void>;
+      readPrefs:     ()                        => Promise<Record<string, unknown>>;
+      writePrefs:    (prefs: Record<string, unknown>) => Promise<void>;
     };
   }
 }
