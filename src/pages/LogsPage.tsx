@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { RefreshCw, X } from 'lucide-react';
 import { julesService } from '../services/julesService';
 import { useAgents } from '../context/AgentsContext';
 import type { LogEntry } from '../types/jules';
@@ -89,8 +90,9 @@ export default function LogsPage() {
           <span style={{ fontSize: 11, color: 'var(--muted)', padding: '0.3rem 0.75rem', border: '1px solid var(--border)', borderRadius: 6 }}>
             {filtered.length} / {logs.length} entrée{logs.length !== 1 ? 's' : ''}
           </span>
-          <button className="btn-ghost" onClick={loadLogs} disabled={loading} style={{ fontSize: 12, padding: '0.3rem 0.65rem' }}>
-            {loading ? '...' : '↻ Actualiser'}
+          <button className="btn-ghost" onClick={loadLogs} disabled={loading} style={{ fontSize: 12, padding: '0.3rem 0.65rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <RefreshCw size={13} strokeWidth={2} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+            {loading ? '...' : 'Actualiser'}
           </button>
         </div>
       </div>
@@ -142,10 +144,11 @@ export default function LogsPage() {
         {(levelFilter !== 'ALL' || sourceFilter !== 'ALL' || search) && (
           <button
             className="btn-ghost"
-            style={{ fontSize: 12, padding: '0.3rem 0.65rem', whiteSpace: 'nowrap' }}
+            style={{ fontSize: 12, padding: '0.3rem 0.65rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}
             onClick={() => { setLevelFilter('ALL'); setSourceFilter('ALL'); setSearch(''); }}
           >
-            ✕ Réinitialiser
+            <X size={13} strokeWidth={2} />
+            Réinitialiser
           </button>
         )}
       </div>
