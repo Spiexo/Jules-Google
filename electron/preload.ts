@@ -12,15 +12,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getJulesSession:    (name: string) => ipcRenderer.invoke('jules:get-session', name),
   createJulesSession: (opts: unknown) => ipcRenderer.invoke('jules:create-session', opts),
   // Jules — Activités & Actions
-  listJulesActivities: (sessionName: string)                 => ipcRenderer.invoke('jules:list-activities', sessionName),
+  listJulesActivities: (sessionName: string, pageToken?: string) => ipcRenderer.invoke('jules:list-activities', sessionName, pageToken),
   sendJulesMessage:    (sessionName: string, prompt: string) => ipcRenderer.invoke('jules:send-message', sessionName, prompt),
   approveJulesPlan:    (sessionName: string)                 => ipcRenderer.invoke('jules:approve-plan', sessionName),
   // Système
   openExternal: (url: string)                 => ipcRenderer.invoke('shell:open-external', url),
   notify:       (title: string, body: string) => ipcRenderer.invoke('app:notify', title, body),
+  openImageDialog: ()                          => ipcRenderer.invoke('dialog:open-image'),
   // Persistance locale
   readSessions:   ()                       => ipcRenderer.invoke('store:read-sessions'),
   writeSessions:  (sessions: unknown[])    => ipcRenderer.invoke('store:write-sessions', sessions),
   readLogs:       ()                       => ipcRenderer.invoke('store:read-logs'),
   appendLog:      (entry: unknown)         => ipcRenderer.invoke('store:append-log', entry),
+  readPrefs:      ()                       => ipcRenderer.invoke('store:read-prefs'),
+  writePrefs:     (prefs: unknown)         => ipcRenderer.invoke('store:write-prefs', prefs),
 });
