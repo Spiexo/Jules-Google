@@ -77,7 +77,22 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
 
         if (apiSessions.length === 0) return;
         setSessions(prev => {
+          const apiMap = new Map(apiSessions.map(s => [s.name, s]));
           const existingNames = new Set(prev.map(s => s.name));
+
+          // Update existing sessions with latest state from API.
+          // If an active session is no longer returned by the API (archived/deleted),
+          // mark it as PAUSED so it stops polling.
+          const updatedExisting = prev.map(s => {
+            const fromApi = apiMap.get(s.name);
+            if (!fromApi) {
+              if (ACTIVE_STATES.includes(s.state)) return { ...s, state: 'PAUSED' as SessionState };
+              return s;
+            }
+            return { ...s, state: fromApi.state ?? s.state, outputs: fromApi.outputs ?? s.outputs, updateTime: fromApi.updateTime ?? s.updateTime };
+          });
+
+          // Add new sessions not yet in local cache.
           const incoming: LocalSession[] = apiSessions
             .filter(s => !existingNames.has(s.name))
             .map(s => ({
@@ -87,7 +102,7 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
               localDescription:  s.prompt     ?? s.title ?? '',
               sourceDisplayName: normalizeSourceName(s.sourceContext?.source ?? s.name),
             }));
-          return incoming.length > 0 ? [...incoming, ...prev] : prev;
+          return incoming.length > 0 ? [...incoming, ...updatedExisting] : updatedExisting;
         });
       } catch {}
     }
@@ -148,6 +163,10 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       await julesService.sendMessage(sessionName, prompt);
+      // Jules peut réactiver une session COMPLETED quand on lui réécrit.
+      // On rafraîchit l'état pour que le polling actif (ACTIVE_STATES) reprenne.
+      const updated = await julesService.getSession(sessionName);
+      setSessions(prev => prev.map(s => s.name === sessionName ? { ...s, ...updated } : s));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erreur lors de l\'envoi du message');
     }
@@ -168,15 +187,22 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
               const merged = { ...existing, ...updated };
               julesService.appendLog(makeLogEntry(merged, updated.state!)).catch(() => {});
               if (TERMINAL_STATES.includes(updated.state)) {
-                const title = updated.state === 'COMPLETED' ? '✓ Session terminée' : '✗ Session échouée';
+                const title = updated.state === 'COMPLETED' ? 'Session terminée' : 'Session échouée';
                 julesService.notify(title, existing.localDescription).catch(() => {});
               }
               return merged;
             }
             return { ...existing, ...updated };
           }));
-        } catch {
-          // Silencieux — on réessaie au prochain tick
+        } catch (err) {
+          // If the session is gone (archived/deleted), stop polling it by marking PAUSED
+          const msg = err instanceof Error ? err.message : '';
+          if (msg.includes('404') || msg.includes('not found') || msg.includes('NOT_FOUND')) {
+            setSessions(prev => prev.map(existing =>
+              existing.name === s.name ? { ...existing, state: 'PAUSED' as SessionState } : existing
+            ));
+          }
+          // Other errors: silent retry on next tick
         }
       });
     }, 10_000);
