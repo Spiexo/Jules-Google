@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 
 export default function SettingsPage() {
   const [keyInput, setKeyInput] = useState('');
@@ -50,7 +51,7 @@ export default function SettingsPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <p style={{ fontWeight: 600 }}>Clé API Jules</p>
           <span className={hasKey ? 'badge badge-lime' : 'badge badge-red'}>
-            {hasKey ? '● Configurée' : '● Non configurée'}
+            {hasKey ? 'Configurée' : 'Non configurée'}
           </span>
         </div>
 
@@ -85,8 +86,9 @@ export default function SettingsPage() {
         </div>
 
         {feedback && (
-          <p style={{ marginTop: 12, fontSize: 12, color: feedback.type === 'success' ? 'var(--lime)' : 'var(--red)' }}>
-            {feedback.type === 'success' ? '✓' : '✗'} {feedback.msg}
+          <p style={{ marginTop: 12, fontSize: 12, color: feedback.type === 'success' ? 'var(--lime)' : 'var(--red)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {feedback.type === 'success' ? <CheckCircle2 size={13} strokeWidth={2} /> : <XCircle size={13} strokeWidth={2} />}
+            {feedback.msg}
           </p>
         )}
       </div>
@@ -96,7 +98,7 @@ export default function SettingsPage() {
         <p style={{ fontWeight: 600, marginBottom: 12 }}>Où trouver ma clé API ?</p>
         <ol style={{ paddingLeft: '1.2rem', fontSize: 12, color: 'var(--muted)', lineHeight: 2, marginBottom: 12 }}>
           <li>Connecte-toi sur <span style={{ color: 'var(--cyan)', fontFamily: 'monospace' }}>jules.google.com</span></li>
-          <li>Va dans <strong style={{ color: 'var(--text)' }}>Settings → API Keys</strong></li>
+          <li>Va dans <strong style={{ color: 'var(--text)' }}>Settings &gt; API Keys</strong></li>
           <li>Crée ou copie ta clé API (max 3 clés par compte)</li>
           <li>Colle-la dans le champ ci-dessus et sauvegarde</li>
         </ol>
