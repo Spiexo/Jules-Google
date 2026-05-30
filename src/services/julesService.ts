@@ -24,8 +24,8 @@ export const julesService = {
     window.electronAPI.createJulesSession(opts),
 
   // Activités
-  listActivities: (sessionName: string): Promise<ListActivitiesResponse> =>
-    window.electronAPI.listJulesActivities(sessionName),
+  listActivities: (sessionName: string, pageToken?: string): Promise<ListActivitiesResponse> =>
+    window.electronAPI.listJulesActivities(sessionName, pageToken),
 
   // Actions
   sendMessage: (sessionName: string, prompt: string): Promise<void> =>
@@ -41,6 +41,9 @@ export const julesService = {
   notify: (title: string, body: string): Promise<void> =>
     window.electronAPI.notify(title, body),
 
+  openImageDialog: (): Promise<{ name: string; preview: string } | null> =>
+    window.electronAPI.openImageDialog(),
+
   // Persistance locale
   readSessions: (): Promise<LocalSession[]> =>
     window.electronAPI.readSessions(),
@@ -53,4 +56,10 @@ export const julesService = {
 
   appendLog: (entry: LogEntry): Promise<void> =>
     window.electronAPI.appendLog(entry),
+
+  readPrefs: (): Promise<Record<string, unknown>> =>
+    window.electronAPI.readPrefs(),
+
+  writePrefs: (prefs: Record<string, unknown>): Promise<void> =>
+    window.electronAPI.writePrefs(prefs),
 };
