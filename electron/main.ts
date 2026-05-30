@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage, shell, Notification } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, Notification } from "electron";
 import * as path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
@@ -159,9 +159,36 @@ ipcMain.handle("app:notify", (_event, title: string, body: string) => {
   if (Notification.isSupported()) new Notification({ title, body }).show();
 });
 
-ipcMain.handle("jules:list-activities", (_event, sessionName: string) =>
-  julesRequest(`${JULES_API_BASE}/${sessionName}/activities`)
-);
+ipcMain.handle("dialog:open-image", async () => {
+  const win = BrowserWindow.getFocusedWindow();
+  const result = win
+    ? await dialog.showOpenDialog(win, {
+        title: "Sélectionner une image",
+        properties: ["openFile"],
+        filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"] }],
+      })
+    : await dialog.showOpenDialog({
+        title: "Sélectionner une image",
+        properties: ["openFile"],
+        filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"] }],
+      });
+
+  if (result.canceled || result.filePaths.length === 0) return null;
+
+  const filePath = result.filePaths[0];
+  const data     = fs.readFileSync(filePath);
+  const ext      = path.extname(filePath).slice(1).toLowerCase();
+  const mime     = ext === "svg" ? "image/svg+xml" : ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+  const dataUrl  = `data:${mime};base64,${data.toString("base64")}`;
+  return { name: path.basename(filePath), preview: dataUrl };
+});
+
+ipcMain.handle("jules:list-activities", (_event, sessionName: string, pageToken?: string) => {
+  const url = new URL(`${JULES_API_BASE}/${sessionName}/activities`);
+  url.searchParams.set("pageSize", "100");
+  if (pageToken) url.searchParams.set("pageToken", pageToken);
+  return julesRequest(url.toString());
+});
 
 ipcMain.handle("jules:send-message", (_event, sessionName: string, prompt: string) =>
   julesRequest(`${JULES_API_BASE}/${sessionName}:sendMessage`, {
@@ -181,6 +208,7 @@ ipcMain.handle("jules:approve-plan", (_event, sessionName: string) =>
 
 const sessionsFile = () => path.join(app.getPath("userData"), "sessions.json");
 const logFile      = () => path.join(app.getPath("userData"), "session-log.json");
+const prefsFile    = () => path.join(app.getPath("userData"), "prefs.json");
 
 ipcMain.handle("store:read-sessions", () => {
   try { return JSON.parse(fs.readFileSync(sessionsFile(), "utf8")); }
@@ -194,6 +222,15 @@ ipcMain.handle("store:write-sessions", (_event, sessions: unknown[]) => {
 ipcMain.handle("store:read-logs", () => {
   try { return JSON.parse(fs.readFileSync(logFile(), "utf8")); }
   catch { return []; }
+});
+
+ipcMain.handle("store:read-prefs", () => {
+  try { return JSON.parse(fs.readFileSync(prefsFile(), "utf8")); }
+  catch { return {}; }
+});
+
+ipcMain.handle("store:write-prefs", (_event, prefs: unknown) => {
+  fs.writeFileSync(prefsFile(), JSON.stringify(prefs, null, 2), "utf8");
 });
 
 ipcMain.handle("store:append-log", (_event, entry: unknown) => {
