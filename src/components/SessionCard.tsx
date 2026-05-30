@@ -1,16 +1,16 @@
 import type { LocalSession } from '../types/jules';
 import { timeAgo } from '../utils/format';
 
-const STATUS: Record<string, { color: string; icon: string; label: string; spin?: boolean }> = {
-  QUEUED:                 { color: '#a78bfa', icon: '◷', label: 'En file d\'attente', spin: true },
-  PLANNING:               { color: '#60a5fa', icon: '◈', label: 'Planification',      spin: true },
-  AWAITING_PLAN_APPROVAL: { color: '#ffa040', icon: '⏸', label: 'Plan à approuver'              },
-  AWAITING_USER_FEEDBACK: { color: '#ffa040', icon: '💬', label: 'Retour requis'                },
-  IN_PROGRESS:            { color: '#00f2fe', icon: '⟳', label: 'En cours',           spin: true },
-  PAUSED:                 { color: '#94a3b8', icon: '⏸', label: 'En pause'                      },
-  COMPLETED:              { color: '#00ff88', icon: '✓', label: 'Terminé'                        },
-  FAILED:                 { color: '#ff4d4d', icon: '✗', label: 'Échec'                          },
-  STATE_UNSPECIFIED:      { color: 'rgba(255,255,255,0.35)', icon: '?', label: 'Inconnu'         },
+const STATUS: Record<string, { color: string; label: string; pulse?: boolean }> = {
+  QUEUED:                 { color: '#a78bfa', label: 'En file d\'attente', pulse: true },
+  PLANNING:               { color: '#60a5fa', label: 'Planification',      pulse: true },
+  AWAITING_PLAN_APPROVAL: { color: '#ffa040', label: 'Plan à approuver'                },
+  AWAITING_USER_FEEDBACK: { color: '#ffa040', label: 'Retour requis'                   },
+  IN_PROGRESS:            { color: '#00f2fe', label: 'En cours',           pulse: true },
+  PAUSED:                 { color: '#94a3b8', label: 'En pause'                        },
+  COMPLETED:              { color: '#00ff88', label: 'Terminé'                         },
+  FAILED:                 { color: '#ff4d4d', label: 'Échec'                           },
+  STATE_UNSPECIFIED:      { color: 'rgba(255,255,255,0.35)', label: 'Inconnu'          },
 };
 
 interface SessionCardProps { session: LocalSession; }
@@ -18,7 +18,6 @@ interface SessionCardProps { session: LocalSession; }
 export default function SessionCard({ session }: SessionCardProps) {
   const status = STATUS[session.state] ?? {
     color: 'rgba(255,255,255,0.35)',
-    icon: '?',
     label: session.state ?? 'Inconnu',
   };
 
@@ -38,10 +37,15 @@ export default function SessionCard({ session }: SessionCardProps) {
         <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
           {session.sourceDisplayName}
         </span>
-        <span style={{ fontSize: '0.75rem', color: status.color, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          <span style={{ display: 'inline-block', animation: status.spin ? 'spin 1.5s linear infinite' : 'none' }}>
-            {status.icon}
-          </span>
+        <span style={{ fontSize: '0.75rem', color: status.color, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <span style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: status.color,
+            display: 'inline-block',
+            animation: status.pulse ? 'pulse 1.5s ease-in-out infinite' : 'none',
+          }} />
           {status.label}
         </span>
       </div>
