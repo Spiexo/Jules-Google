@@ -1,4 +1,3 @@
-// Converts 'sources/github/owner/repo' → 'owner/repo', leaves anything else untouched
 export function normalizeSourceName(name: string): string {
   const parts = name.split('/');
   return parts.length >= 4 && parts[0] === 'sources' ? `${parts[2]}/${parts[3]}` : name;
