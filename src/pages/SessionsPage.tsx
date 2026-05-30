@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { RefreshCw, Plus, Check, ArrowRight, MessageCircle, GitPullRequest, ExternalLink, X, AlertCircle, GitBranch, Play } from 'lucide-react';
+import ImageAttachButton from '../components/ImageAttachButton';
 import { useAgents } from '../context/AgentsContext';
 import { julesService } from '../services/julesService';
 import type { AutomationMode, LocalSession } from '../types/jules';
@@ -20,94 +22,6 @@ const STATE_BADGE: Record<string, string> = {
   STATE_UNSPECIFIED:      'badge-gray',
 };
 
-function setAutomationMode(sourceId: string, mode: AutomationMode) {
-  localStorage.setItem(`jules_automation_${sourceId}`, mode);
-}
-
-interface ImageAttachButtonProps { onSelect: (file: File, preview: string) => void; }
-
-function ImageAttachButton({ onSelect }: ImageAttachButtonProps) {
-  const [open, setOpen]   = useState(false);
-  const fileRef           = useRef<HTMLInputElement>(null);
-  const wrapRef           = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { onSelect(file, reader.result as string); setOpen(false); };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
-
-  return (
-    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0 }}>
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        style={{
-          width: 30, height: 30,
-          borderRadius: 8,
-          border: '1px solid var(--border)',
-          background: open ? 'var(--s2)' : 'transparent',
-          color: 'var(--muted)',
-          fontSize: 18, lineHeight: 1,
-          cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-        title="Joindre une image"
-      >
-        +
-      </button>
-
-      {open && (
-        <div style={{
-          position: 'absolute',
-          bottom: 'calc(100% + 6px)',
-          left: 0,
-          background: 'var(--s1)',
-          border: '1px solid var(--border)',
-          borderRadius: 10,
-          padding: '0.35rem 0',
-          minWidth: 180,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-          zIndex: 50,
-        }}>
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              width: '100%', padding: '0.5rem 0.85rem',
-              background: 'transparent', color: 'var(--text)',
-              fontSize: 13, textAlign: 'left', cursor: 'pointer',
-            }}
-          >
-            <span style={{ fontSize: 16 }}>🖼</span>
-            Importer une image
-          </button>
-        </div>
-      )}
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        style={{ display: 'none' }}
-        onChange={handleFile}
-      />
-    </div>
-  );
-}
 
 function SessionRow({ session, onApprove, onReply, onView }: {
   session: LocalSession;
@@ -139,41 +53,46 @@ function SessionRow({ session, onApprove, onReply, onView }: {
 
       <span className={`badge ${STATE_BADGE[session.state] ?? 'badge-gray'}`}>
         {isActive && session.state !== 'AWAITING_PLAN_APPROVAL' && session.state !== 'AWAITING_USER_FEEDBACK' && (
-          <span className="pulse">●</span>
+          <span className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block', marginRight: 4 }} />
         )}
         {STATE_LABEL[session.state] ?? session.state}
       </span>
 
       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
         {session.state === 'AWAITING_PLAN_APPROVAL' && (
-          <button className="btn-primary" style={{ fontSize: 11, padding: '0.25rem 0.65rem' }} onClick={onApprove}>
-            ✓ Approuver
+          <button className="btn-primary" style={{ fontSize: 11, padding: '0.25rem 0.65rem', display: 'flex', alignItems: 'center', gap: 5 }} onClick={onApprove}>
+            <Check size={12} strokeWidth={2.5} />
+            Approuver
           </button>
         )}
-        <button className="btn-ghost" style={{ fontSize: 11, padding: '0.25rem 0.65rem' }} onClick={onView}>
-          → Voir
+        <button className="btn-ghost" style={{ fontSize: 11, padding: '0.25rem 0.65rem', display: 'flex', alignItems: 'center', gap: 5 }} onClick={onView}>
+          Voir
+          <ArrowRight size={12} strokeWidth={2} />
         </button>
         {isActive && (
-          <button className="btn-ghost" style={{ fontSize: 11, padding: '0.25rem 0.65rem' }} onClick={onReply}>
-            ✉ Répondre
+          <button className="btn-ghost" style={{ fontSize: 11, padding: '0.25rem 0.65rem', display: 'flex', alignItems: 'center', gap: 5 }} onClick={onReply}>
+            <MessageCircle size={12} strokeWidth={2} />
+            Répondre
           </button>
         )}
         {pr && (
           <button
             className="btn-ghost"
-            style={{ fontSize: 11, padding: '0.25rem 0.65rem' }}
+            style={{ fontSize: 11, padding: '0.25rem 0.65rem', display: 'flex', alignItems: 'center', gap: 5 }}
             onClick={() => julesService.openExternal(pr.url)}
           >
-            ↗ PR
+            <GitPullRequest size={12} strokeWidth={2} />
+            PR
           </button>
         )}
         {session.url && (
           <button
             className="btn-ghost"
-            style={{ fontSize: 11, padding: '0.25rem 0.65rem' }}
+            style={{ fontSize: 11, padding: '0.25rem 0.65rem', display: 'flex', alignItems: 'center', gap: 5 }}
             onClick={() => session.url && julesService.openExternal(session.url)}
           >
-            ↗ Jules
+            <ExternalLink size={12} strokeWidth={2} />
+            Jules
           </button>
         )}
       </div>
@@ -191,27 +110,26 @@ export default function SessionsPage({ onSelectSession }: { onSelectSession: (na
   const [selectedSource, setSelectedSource]   = useState<string | null>(null);
   const [replySession, setReplySession]        = useState<string | null>(null);
   const [replyText, setReplyText]              = useState('');
-  const [replyImage, setReplyImage]            = useState<{ file: File; preview: string } | null>(null);
+  const [replyImage, setReplyImage]            = useState<{ name: string; preview: string } | null>(null);
   const [replySending, setReplySending]        = useState(false);
   const [showModal, setShowModal]              = useState(false);
-  const [automationModes, setAutomationModes] = useState<Record<string, AutomationMode>>(() => {
-    const result: Record<string, AutomationMode> = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key?.startsWith('jules_automation_')) {
-        const sourceId = key.replace('jules_automation_', '');
-        result[sourceId] = localStorage.getItem(key) as AutomationMode;
+  const [automationModes, setAutomationModes] = useState<Record<string, AutomationMode>>({});
+
+  useEffect(() => {
+    julesService.readPrefs().then(prefs => {
+      const modes = prefs.automationModes;
+      if (modes && typeof modes === 'object') {
+        setAutomationModes(modes as Record<string, AutomationMode>);
       }
-    }
-    return result;
-  });
+    }).catch(() => {});
+  }, []);
 
   const [modalSource, setModalSource]           = useState('');
   const [modalBranch, setModalBranch]           = useState('');
   const [modalPrompt, setModalPrompt]           = useState('');
   const [modalTitle, setModalTitle]             = useState('');
   const [modalRequirePlan, setModalRequirePlan] = useState(false);
-  const [modalImage, setModalImage]             = useState<{ file: File; preview: string } | null>(null);
+  const [modalImage, setModalImage]             = useState<{ name: string; preview: string } | null>(null);
 
   useEffect(() => {
     if (sources.length === 0) fetchSources();
@@ -286,18 +204,21 @@ export default function SessionsPage({ onSelectSession }: { onSelectSession: (na
           <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>Dépôts GitHub connectés à Jules</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn-ghost" onClick={fetchSources} disabled={loadingSources}>
-            {loadingSources ? '...' : '↻ Actualiser'}
+          <button className="btn-ghost" onClick={fetchSources} disabled={loadingSources} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <RefreshCw size={14} strokeWidth={2} style={{ animation: loadingSources ? 'spin 1s linear infinite' : 'none' }} />
+            {loadingSources ? '...' : 'Actualiser'}
           </button>
-          <button className="btn-primary" onClick={() => setShowModal(true)}>
-            + Nouvelle session
+          <button className="btn-primary" onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Plus size={14} strokeWidth={2.2} />
+            Nouvelle session
           </button>
         </div>
       </div>
 
       {error && (
-        <p style={{ fontSize: 12, color: 'var(--red)', padding: '0.5rem 0.75rem', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>
-          ✗ {error}
+        <p style={{ fontSize: 12, color: 'var(--red)', padding: '0.5rem 0.75rem', background: 'rgba(239,68,68,0.08)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <AlertCircle size={13} strokeWidth={2} />
+          {error}
         </p>
       )}
 
@@ -338,13 +259,14 @@ export default function SessionsPage({ onSelectSession }: { onSelectSession: (na
                       {displayName}
                     </p>
                     {source.githubRepo?.defaultBranch && (
-                      <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2, fontFamily: 'monospace' }}>
-                        ⎇ {source.githubRepo.defaultBranch.displayName}
+                      <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2, fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <GitBranch size={10} strokeWidth={2} />
+                        {source.githubRepo.defaultBranch.displayName}
                       </p>
                     )}
                   </div>
                   {activeSessions.length > 0
-                    ? <span className="badge badge-cyan" style={{ flexShrink: 0 }}><span className="pulse">●</span> {activeSessions.length}</span>
+                    ? <span className="badge badge-cyan" style={{ flexShrink: 0 }}><span className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block', marginRight: 4 }} /> {activeSessions.length}</span>
                     : <span className="badge badge-gray" style={{ flexShrink: 0 }}>{sourceSessions.length}</span>
                   }
                 </div>
@@ -353,8 +275,13 @@ export default function SessionsPage({ onSelectSession }: { onSelectSession: (na
                   onClick={e => {
                     e.stopPropagation();
                     const next: AutomationMode = isAutoOn ? 'AUTOMATION_MODE_UNSPECIFIED' : 'AUTO_CREATE_PR';
-                    setAutomationMode(source.id, next);
-                    setAutomationModes(prev => ({ ...prev, [source.id]: next }));
+                    setAutomationModes(prev => {
+                      const updated = { ...prev, [source.id]: next };
+                      julesService.readPrefs().then(prefs =>
+                        julesService.writePrefs({ ...prefs, automationModes: updated })
+                      ).catch(() => {});
+                      return updated;
+                    });
                   }}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}
                 >
@@ -395,8 +322,9 @@ export default function SessionsPage({ onSelectSession }: { onSelectSession: (na
               {selectedSource ? `Sessions — ${displayNameFor(selectedSource)}` : 'Toutes les sessions'}
             </p>
             {selectedSource && (
-              <button className="btn-ghost" style={{ fontSize: 11, padding: '0.2rem 0.6rem' }} onClick={() => setSelectedSource(null)}>
-                ✕ Effacer le filtre
+              <button className="btn-ghost" style={{ fontSize: 11, padding: '0.2rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setSelectedSource(null)}>
+                <X size={11} strokeWidth={2} />
+                Effacer le filtre
               </button>
             )}
           </div>
@@ -420,23 +348,24 @@ export default function SessionsPage({ onSelectSession }: { onSelectSession: (na
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <img
                           src={replyImage.preview}
-                          alt={replyImage.file.name}
+                          alt={replyImage.name}
                           style={{ height: 48, borderRadius: 6, border: '1px solid var(--border)', objectFit: 'cover' }}
                         />
                         <span style={{ fontSize: 12, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {replyImage.file.name}
+                          {replyImage.name}
                         </span>
                         <button
                           className="btn-ghost"
-                          style={{ fontSize: 11, padding: '0.1rem 0.4rem' }}
+                          style={{ padding: '0.2rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                           onClick={() => setReplyImage(null)}
+                          title="Retirer"
                         >
-                          ✕
+                          <X size={12} strokeWidth={2} />
                         </button>
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <ImageAttachButton onSelect={(file, preview) => setReplyImage({ file, preview })} />
+                      <ImageAttachButton onSelect={(name, preview) => setReplyImage({ name, preview })} />
                       <input
                         autoFocus
                         value={replyText}
@@ -482,7 +411,7 @@ export default function SessionsPage({ onSelectSession }: { onSelectSession: (na
           <div className="card" style={{ width: 480, maxWidth: '90vw' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <p style={{ fontWeight: 700, fontSize: 15 }}>Nouvelle session</p>
-              <button className="btn-ghost" style={{ padding: '0.2rem 0.5rem', fontSize: 14 }} onClick={() => setShowModal(false)}>✕</button>
+              <button className="btn-ghost" style={{ padding: '0.3rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowModal(false)} title="Fermer"><X size={16} strokeWidth={2} /></button>
             </div>
 
             <form onSubmit={handleModalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -531,17 +460,17 @@ export default function SessionsPage({ onSelectSession }: { onSelectSession: (na
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
                     <img
                       src={modalImage.preview}
-                      alt={modalImage.file.name}
+                      alt={modalImage.name}
                       style={{ height: 48, borderRadius: 6, border: '1px solid var(--border)', objectFit: 'cover' }}
                     />
                     <span style={{ fontSize: 12, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {modalImage.file.name}
+                      {modalImage.name}
                     </span>
-                    <button type="button" className="btn-ghost" style={{ fontSize: 11, padding: '0.1rem 0.4rem' }} onClick={() => setModalImage(null)}>✕</button>
+                    <button type="button" className="btn-ghost" style={{ padding: '0.2rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setModalImage(null)} title="Retirer"><X size={12} strokeWidth={2} /></button>
                   </div>
                 )}
                 <div style={{ marginTop: 8 }}>
-                  <ImageAttachButton onSelect={(file, preview) => setModalImage({ file, preview })} />
+                  <ImageAttachButton onSelect={(name, preview) => setModalImage({ name, preview })} />
                 </div>
               </div>
 
@@ -557,7 +486,12 @@ export default function SessionsPage({ onSelectSession }: { onSelectSession: (na
                 </label>
               </div>
 
-              {error && <p style={{ fontSize: 12, color: 'var(--red)' }}>✗ {error}</p>}
+              {error && (
+                <p style={{ fontSize: 12, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <AlertCircle size={13} strokeWidth={2} />
+                  {error}
+                </p>
+              )}
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
                 <button type="button" className="btn-ghost" onClick={() => { setShowModal(false); setModalImage(null); }}>Annuler</button>
@@ -565,8 +499,10 @@ export default function SessionsPage({ onSelectSession }: { onSelectSession: (na
                   type="submit"
                   className="btn-primary"
                   disabled={!modalSource || !modalPrompt.trim() || creatingSession}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
                 >
-                  {creatingSession ? '⟳ Lancement...' : '⚡ Lancer'}
+                  <Play size={13} strokeWidth={2.2} fill="currentColor" />
+                  {creatingSession ? 'Lancement...' : 'Lancer'}
                 </button>
               </div>
             </form>
