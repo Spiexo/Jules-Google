@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
+import { RefreshCw, Play, AlertCircle } from 'lucide-react';
 import { useAgents } from '../context/AgentsContext';
 
 export default function LaunchForm() {
@@ -33,7 +34,7 @@ export default function LaunchForm() {
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <select value={selectedSource} onChange={e => setSelectedSource(e.target.value)} disabled={loadingSources} style={{ flex: 1 }}>
               <option value="" disabled>
-                {loadingSources ? 'Chargement...' : sources.length === 0 ? 'Aucune source — cliquez ↻' : 'Sélectionner un dépôt'}
+                {loadingSources ? 'Chargement...' : sources.length === 0 ? 'Aucune source — cliquez Actualiser' : 'Sélectionner un dépôt'}
               </option>
               {sources.map(s => (
                 <option key={s.name} value={s.name}>
@@ -41,8 +42,9 @@ export default function LaunchForm() {
                 </option>
               ))}
             </select>
-            <button type="button" className="btn-ghost" onClick={fetchSources} disabled={loadingSources}>
-              {loadingSources ? '...' : '↻'}
+            <button type="button" className="btn-ghost" onClick={fetchSources} disabled={loadingSources} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <RefreshCw size={14} strokeWidth={2} style={{ animation: loadingSources ? 'spin 1s linear infinite' : 'none' }} />
+              {loadingSources ? '...' : 'Actualiser'}
             </button>
           </div>
         </div>
@@ -57,10 +59,16 @@ export default function LaunchForm() {
           />
         </div>
 
-        {error && <p style={{ fontSize: 12, color: 'var(--red)', margin: 0 }}>✗ {error}</p>}
+        {error && (
+          <p style={{ fontSize: 12, color: 'var(--red)', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AlertCircle size={14} strokeWidth={2} />
+            {error}
+          </p>
+        )}
 
-        <button type="submit" className="btn-primary" disabled={!canSubmit} style={{ alignSelf: 'flex-start' }}>
-          {creatingSession ? '⟳ Lancement...' : '⚡ Lancer l\'agent'}
+        <button type="submit" className="btn-primary" disabled={!canSubmit} style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Play size={14} strokeWidth={2.2} fill="currentColor" />
+          {creatingSession ? 'Lancement...' : 'Lancer l\'agent'}
         </button>
       </form>
     </div>
