@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { ExternalLink, GitPullRequest, GitMerge, XCircle, ChevronDown } from 'lucide-react';
 import { useAgents } from '../context/AgentsContext';
 import { julesService } from '../services/julesService';
 import type { LocalSession } from '../types/jules';
@@ -8,13 +9,26 @@ import { timeAgo } from '../utils/format';
 
 const PR_PAGE_SIZE = 5;
 
+// ── PR status (manuel, persisté localement) ────────────────────────────────────
+
+type PRStatus = 'open' | 'merged' | 'closed';
+
+const PR_STATUS_META: Record<PRStatus, { label: string; badge: string; Icon: typeof GitPullRequest }> = {
+  open:   { label: 'Ouverte', badge: 'badge-cyan', Icon: GitPullRequest },
+  merged: { label: 'Merged',  badge: 'badge-lime', Icon: GitMerge       },
+  closed: { label: 'Fermée',  badge: 'badge-red',  Icon: XCircle        },
+};
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function buildChartData(sessions: LocalSession[]): number[] {
   const counts = Array(7).fill(0);
-  const now = Date.now();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
   sessions.forEach(s => {
-    const diffDays = Math.floor((now - new Date(s.createTime).getTime()) / (1000 * 60 * 60 * 24));
+    const day = new Date(s.createTime);
+    day.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((todayStart.getTime() - day.getTime()) / 86_400_000);
     if (diffDays >= 0 && diffDays < 7) counts[6 - diffDays]++;
   });
   return counts;
@@ -43,15 +57,76 @@ function buildPRList(sessions: LocalSession[]) {
   });
 }
 
-const PR_BADGE: Record<string, string> = {
-  COMPLETED: 'badge-lime',
-  FAILED:    'badge-red',
-};
+function PRStatusBadge({ status, onChange }: { status: PRStatus; onChange: (next: PRStatus) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
-const PR_LABEL: Record<string, string> = {
-  COMPLETED: 'Merged',
-  FAILED:    'Fermée',
-};
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const meta = PR_STATUS_META[status];
+  const { Icon } = meta;
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
+        className={`badge ${meta.badge}`}
+        style={{ cursor: 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        title="Cliquer pour changer le statut"
+      >
+        <Icon size={11} strokeWidth={2} />
+        {meta.label}
+        <ChevronDown size={10} strokeWidth={2} style={{ opacity: 0.7 }} />
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 4px)',
+          left: 0,
+          background: 'var(--s1)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          padding: '0.25rem 0',
+          minWidth: 130,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+          zIndex: 50,
+        }}>
+          {(Object.keys(PR_STATUS_META) as PRStatus[]).map(s => {
+            const m = PR_STATUS_META[s];
+            const SIcon = m.Icon;
+            const isCurrent = s === status;
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={e => { e.stopPropagation(); onChange(s); setOpen(false); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  width: '100%', padding: '0.4rem 0.75rem',
+                  background: isCurrent ? 'var(--s2)' : 'transparent',
+                  color: 'var(--text)', fontSize: 12, textAlign: 'left',
+                  border: 'none', cursor: 'pointer',
+                }}
+              >
+                <SIcon size={12} strokeWidth={2} />
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Composants ─────────────────────────────────────────────────────────────────
 
@@ -116,7 +191,30 @@ export default function DashboardPage() {
   const chartData   = buildChartData(sessions);
   const chartLabels = getLast7DayLabels();
   const prs         = buildPRList(sessions);
-  const openPRs     = prs.filter(p => !['COMPLETED', 'FAILED'].includes(p.state ?? ''));
+
+  const [prStatuses, setPrStatuses] = useState<Record<string, PRStatus>>({});
+
+  useEffect(() => {
+    julesService.readPrefs().then(prefs => {
+      const stored = prefs.prStatuses;
+      if (stored && typeof stored === 'object') {
+        setPrStatuses(stored as Record<string, PRStatus>);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const setPrStatus = (url: string, next: PRStatus) => {
+    setPrStatuses(prev => {
+      const updated = { ...prev, [url]: next };
+      julesService.readPrefs().then(prefs =>
+        julesService.writePrefs({ ...prefs, prStatuses: updated })
+      ).catch(() => {});
+      return updated;
+    });
+  };
+
+  const statusFor = (url: string): PRStatus => prStatuses[url] ?? 'open';
+  const openPRs   = prs.filter(p => p.url && statusFor(p.url) === 'open');
 
   const [prPage, setPrPage] = useState(1);
   const paginatedPrs = prs.slice((prPage - 1) * PR_PAGE_SIZE, prPage * PR_PAGE_SIZE);
@@ -135,7 +233,7 @@ export default function DashboardPage() {
           label="Sessions actives"
           value={active.length}
           accent="var(--cyan)"
-          sub={active.length > 0 ? '● En cours' : 'Aucune'}
+          sub={active.length > 0 ? 'En cours' : 'Aucune'}
         />
         <div className="card" style={{ flex: 1 }}>
           <p style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
@@ -196,7 +294,7 @@ export default function DashboardPage() {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontWeight: 500, fontSize: 13 }}>{s.sourceDisplayName}</span>
-                    <span className="badge badge-cyan"><span className="pulse">●</span> {s.state}</span>
+                    <span className="badge badge-cyan"><span className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block', marginRight: 4 }} /> {s.state}</span>
                   </div>
                   <p style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {s.title || s.localDescription}
@@ -238,14 +336,17 @@ export default function DashboardPage() {
                     style={{ color: pr.url ? 'var(--cyan)' : 'var(--text)', fontWeight: 500, cursor: pr.url ? 'pointer' : 'default' }}
                     onClick={() => pr.url && julesService.openExternal(pr.url)}
                   >
-                    {pr.title}
-                    {pr.url && <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.6 }}>↗</span>}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      {pr.title}
+                      {pr.url && <ExternalLink size={11} strokeWidth={2} style={{ opacity: 0.5 }} />}
+                    </span>
                   </td>
                   <td style={{ color: 'var(--muted)', fontFamily: 'monospace', fontSize: 12 }}>{pr.repo}</td>
-                  <td>
-                    <span className={`badge ${PR_BADGE[pr.state ?? ''] ?? 'badge-cyan'}`}>
-                      {PR_LABEL[pr.state ?? ''] ?? 'Open'}
-                    </span>
+                  <td onClick={e => e.stopPropagation()}>
+                    {pr.url
+                      ? <PRStatusBadge status={statusFor(pr.url)} onChange={next => setPrStatus(pr.url!, next)} />
+                      : <span className="badge badge-gray">—</span>
+                    }
                   </td>
                   <td style={{ color: 'var(--muted)', fontSize: 12 }}>il y a {timeAgo(pr.time)}</td>
                 </tr>
