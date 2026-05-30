@@ -1,11 +1,12 @@
 import type { Page } from '../App';
+import { LayoutDashboard, Boxes, ScrollText, Settings, Terminal, type LucideIcon } from 'lucide-react';
 
-interface NavItem { id: Page; icon: string; label: string; }
+interface NavItem { id: Page; label: string; Icon: LucideIcon; }
 
 const NAV: NavItem[] = [
-  { id: 'dashboard', icon: '▣',  label: 'Dashboard' },
-  { id: 'sessions',  icon: '◈',  label: 'Sessions'  },
-  { id: 'logs',      icon: '▤',  label: 'Logs'      },
+  { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { id: 'sessions',  label: 'Sessions',  Icon: Boxes          },
+  { id: 'logs',      label: 'Logs',      Icon: ScrollText     },
 ];
 
 interface SidebarProps { active: Page; onNavigate: (p: Page) => void; }
@@ -24,7 +25,7 @@ export default function Sidebar({ active, onNavigate }: SidebarProps) {
       {/* Logo */}
       <div style={{ padding: '0 1.25rem 1.5rem', borderBottom: '1px solid var(--border)', marginBottom: '0.75rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: 18, color: 'var(--lime)', lineHeight: 1 }}>◪</span>
+          <Terminal size={18} color="var(--lime)" strokeWidth={2.2} />
           <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em', color: 'var(--text)' }}>
             Jules Controller
           </span>
@@ -35,6 +36,7 @@ export default function Sidebar({ active, onNavigate }: SidebarProps) {
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, padding: '0 0.75rem' }}>
         {NAV.map(item => {
           const isActive = active === item.id;
+          const { Icon } = item;
           return (
             <button
               key={item.id}
@@ -56,7 +58,7 @@ export default function Sidebar({ active, onNavigate }: SidebarProps) {
                 boxShadow: isActive ? '0 0 12px rgba(163,230,53,0.08)' : 'none',
               }}
             >
-              <span style={{ fontSize: 14, width: 18, textAlign: 'center' }}>{item.icon}</span>
+              <Icon size={16} strokeWidth={1.8} />
               {item.label}
             </button>
           );
@@ -82,7 +84,7 @@ export default function Sidebar({ active, onNavigate }: SidebarProps) {
             transition: 'all 0.15s',
           }}
         >
-          <span style={{ fontSize: 14, width: 18, textAlign: 'center' }}>⚙</span>
+          <Settings size={16} strokeWidth={1.8} />
           Settings
         </button>
       </div>
