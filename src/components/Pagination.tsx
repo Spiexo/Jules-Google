@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 function pageNumbers(current: number, total: number): (number | '...')[] {
   if (total <= 6) return Array.from({ length: total }, (_, i) => i + 1);
@@ -70,13 +71,14 @@ export default function Pagination({ page, pageSize, total, onChange }: Paginati
           style={page === 1 ? BTN_DISABLED : BTN}
           disabled={page === 1}
           onClick={() => onChange(page - 1)}
+          title="Précédent"
         >
-          ←
+          <ChevronLeft size={14} strokeWidth={2} />
         </button>
 
         {pageNumbers(page, totalPages).map((p, i) =>
           p === '...'
-            ? <span key={`ellipsis-${i}`} style={{ fontSize: 12, color: 'var(--muted)', padding: '0 2px' }}>…</span>
+            ? <span key={`ellipsis-${i}`} style={{ fontSize: 12, color: 'var(--muted)', padding: '0 2px' }}>...</span>
             : <button
                 key={p}
                 style={p === page ? BTN_ACTIVE : BTN}
@@ -90,8 +92,9 @@ export default function Pagination({ page, pageSize, total, onChange }: Paginati
           style={page === totalPages ? BTN_DISABLED : BTN}
           disabled={page === totalPages}
           onClick={() => onChange(page + 1)}
+          title="Suivant"
         >
-          →
+          <ChevronRight size={14} strokeWidth={2} />
         </button>
       </div>
     </div>
